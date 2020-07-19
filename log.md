@@ -98,3 +98,7 @@ Wasn't putting oauth Authorization header in headers map. Correcting that, just 
 ## 7/18/20
 
 created private git repo
+
+## 7/19/20
+
+got periodic TimerTask thing working in `backpressure` namespace

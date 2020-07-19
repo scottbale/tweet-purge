@@ -1,8 +1,7 @@
 (ns purge
   (:require
    [clj-http.client :as client]
-   [clojure.tools.logging :as log]
-   )
+   [clojure.tools.logging :as log])
   (:import
    [java.net URLEncoder]
    [java.nio ByteBuffer]
