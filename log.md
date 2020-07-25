@@ -102,3 +102,10 @@ created private git repo
 ## 7/19/20
 
 got periodic TimerTask thing working in `backpressure` namespace
+
+## 7/25/20
+
+* Replaced Timer/TimerTask with ScheduledExecutorService
+* Added core.async to backpressure
+* TODO: `with-backpressure` fn; think about worker count mapping to number of go blocks for each
+  chunk

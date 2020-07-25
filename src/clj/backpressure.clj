@@ -35,6 +35,10 @@
     (f x)
     (recur (<! chan))))
 
+(defn with-backpressure
+  "Asynchronously execute f, returning a Promise."
+  [f coll chunk-size delay-seconds])
+
 ;; sample function(s)
 
 (defn print-ids [ids]
