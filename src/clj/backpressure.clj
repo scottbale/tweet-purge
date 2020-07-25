@@ -27,18 +27,19 @@
       (do-next-chunk coll)
       completion)))
 
+(defn put-in [chan x]
+  (go (>! chan x)))
+
+(defn looping-invoke [chan f]
+  (go-loop [x (<! chan)]
+    (f x)
+    (recur (<! chan))))
+
+;; sample function(s)
+
 (defn print-ids [ids]
   (doseq [id ids]
     (println ">>>>>>>>" id)))
-
-(defn print-ids-from-chan [chan]
-  (go-loop [ids (<! chan)]
-    (doseq [id ids]
-      (println ">>>>>>>>" id))
-    (recur (<! chan))))
-
-(defn put-ids-in-chan [chan ids]
-  (go (>! chan ids)))
 
 
 (comment
@@ -49,8 +50,8 @@
         chan (chan chunk)
         ses (Executors/newScheduledThreadPool 1)
         ]
-    (print-ids-from-chan chan)
-    (do-per-chunk (partial put-ids-in-chan chan) ids ses period chunk))
+    (looping-invoke chan print-ids)
+    (do-per-chunk (partial put-in chan) ids ses period chunk))
 
   (let [ids [:foo1 :bar1 :baz1 :foo2 :bar2 :baz2 :foo3 :bar3 :baz3 :foo4]
         period 3 ;; sec
