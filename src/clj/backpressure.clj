@@ -1,11 +1,9 @@
 (ns backpressure
   (:require
-   [clojure.core.async :refer [chan go <! >!! sliding-buffer poll!]]
+   [clojure.core.async :refer [chan go go-loop <! >!]]
    [clojure.tools.logging :as log])
   (:import
    [java.util.concurrent Executors TimeUnit ScheduledExecutorService]))
-
-;; java.util.concurrent.ScheduledExecutorService
 
 (defn schedule [f scheduled-executor-service seconds]
   (.schedule scheduled-executor-service f seconds TimeUnit/SECONDS))
@@ -29,14 +27,30 @@
       (do-next-chunk coll)
       completion)))
 
-;; misc
-
 (defn print-ids [ids]
   (doseq [id ids]
     (println ">>>>>>>>" id)))
 
+(defn print-ids-from-chan [chan]
+  (go-loop [ids (<! chan)]
+    (doseq [id ids]
+      (println ">>>>>>>>" id))
+    (recur (<! chan))))
+
+(defn put-ids-in-chan [chan ids]
+  (go (>! chan ids)))
+
 
 (comment
+
+  (let [ids [:foo1 :bar1 :baz1 :foo2 :bar2 :baz2 :foo3 :bar3 :baz3 :foo4]
+        period 3 ;; sec
+        chunk 3
+        chan (chan chunk)
+        ses (Executors/newScheduledThreadPool 1)
+        ]
+    (print-ids-from-chan chan)
+    (do-per-chunk (partial put-ids-in-chan chan) ids ses period chunk))
 
   (let [ids [:foo1 :bar1 :baz1 :foo2 :bar2 :baz2 :foo3 :bar3 :baz3 :foo4]
         period 3 ;; sec
