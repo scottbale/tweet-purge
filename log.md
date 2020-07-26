@@ -109,3 +109,7 @@ got periodic TimerTask thing working in `backpressure` namespace
 * Added core.async to backpressure
 * TODO: `with-backpressure` fn; think about worker count mapping to number of go blocks for each
   chunk
+
+## 7/26/20
+
+twiddling with asynchrony, completion, logging - WIP
