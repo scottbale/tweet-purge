@@ -112,4 +112,8 @@ got periodic TimerTask thing working in `backpressure` namespace
 
 ## 7/26/20
 
-twiddling with asynchrony, completion, logging - WIP
+* twiddling with asynchrony, completion, logging - WIP
+* `backpressure`, `backpressure-env`, `with-backpressure`
+* stoopidly had with-backpressure blocking on the completion of chunking - moved that into a future
+* completion triggered by putting `:done` into the chan.. but what about errors and retries?
+  * use `alts!` with a "done" chan and a queue chan, giving priority to the queue, for retrying

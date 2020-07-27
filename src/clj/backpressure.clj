@@ -1,6 +1,6 @@
 (ns backpressure
   (:require
-   [clojure.core.async :refer [chan go go-loop <! >!]]
+   [clojure.core.async :refer [chan go go-loop <! >! >!!]]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log])
   (:import
@@ -14,34 +14,55 @@
   which will be completed when all chunks are completed. Use provided ScheduledExecutorService. f
   should be a function of a single arg, which is a collection of at most length equal to chunk. The
   time is measured from the end of the function invocation."
-  [f coll ^ScheduledExecutorService ses period chunk]
+  [{:keys [executor period chunk] :as env} f coll]
   (let [completion (promise)]
     (letfn [(do-next-chunk [xs]
-              (log/debug "next-chunk: xs" xs)
+              (log/trace "next-chunk: xs" xs)
               (let [some-xs (take chunk xs)
                     rest-xs (drop chunk xs)]
-                (log/debug "next-chunk: scheduling" some-xs)
+                (log/trace "next-chunk: scheduling" some-xs)
                 (schedule (fn []
-                            (log/debug "next-chunk: fn" some-xs)
+                            (log/trace "next-chunk: fn" some-xs)
                             (f some-xs)
                             (if (seq rest-xs)
                               (do-next-chunk rest-xs)
                               (deliver completion true)))
-                          ses period)))]
+                          executor period)))]
       (do-next-chunk coll)
       completion)))
 
 (defn put-in [chan x]
   (go (>! chan x)))
 
-(defn looping-invoke [chan f]
+(defn looping-invoke [chan f finished]
   (go-loop [x (<! chan)]
-    (f x)
-    (recur (<! chan))))
+    (if (= x :done)
+      (deliver finished true)
+      (do
+        (f x)
+        (recur (<! chan))))))
+
+(defn backpressure-env [task-count]
+  {:executor (Executors/newScheduledThreadPool (+ 2 task-count))})
+
+(defn backpressure [env period chunk]
+  (assoc env :period period :chunk chunk))
 
 (defn with-backpressure
-  "Asynchronously execute f, returning a Promise."
-  [f coll chunk-size delay-seconds])
+  "Asynchronously execute f on successive chunks of collection coll, returning a Promise.
+  Environment will indicate chunk size and period, in seconds, in between each chunk."
+  [{:keys [executor period chunk] :as env} f coll]
+  (let [chan (chan chunk)
+        finished (promise)
+        chunking (do-per-chunk env (partial put-in chan) coll)]
+    (looping-invoke chan f finished)
+    (.submit executor
+             (fn []
+               (log/debug "awaiting chunking...")
+               (deref chunking)
+               (log/debug "chunking done, notifying chan...")
+               (>!! chan :done)))
+    finished))
 
 ;; sample function(s)
 
@@ -56,10 +77,6 @@
     (println id)
     id))
 
-(defn print-ids [ids]
-  (doseq [id ids]
-    (println ">>>>>>>>" id)))
-
 (defn print-and-log-ids [writer ids]
   (let [f (comp (partial log-id writer) print-id)]
     (doall (map f ids))))
@@ -67,34 +84,28 @@
 
 (comment
 
-  (with-open [writer (io/writer "completed.log" :append true)]
-    (let [ids (take 10 (map #(str "foo" %) (range)))
-          period 3 ;; sec
-          chunk 3
-          chan (chan chunk)
-          ses (Executors/newScheduledThreadPool 1)
-          completion (do-per-chunk (partial put-in chan) ids ses period chunk)]
-      (looping-invoke chan (partial print-and-log-ids writer))
-      (println ".....awaiting completion.....")
-      (deref completion) ;; gotta block or else stream gets closed too soon
-      (println "...done!")))
+  (with-open [w1 (io/writer "tweets.log" :append true)
+              w2 (io/writer "likes.log" :append true)]
+    (let [env (backpressure-env 2)
+          b1 (backpressure env 5 3)
+          b2 (backpressure env 3 5)
+          tweets (take 25 (map #(str "foo" %) (range)))
+          likes (take 32 (map #(str "bar" %) (range)))
+          p1 (with-backpressure b1 (partial print-and-log-ids w1) tweets)
+          p2 (with-backpressure b2 (partial print-and-log-ids w2) likes)]
+      (log/info ".....awaiting completion.....")
+      (deref p1) ;; gotta block or else writer(s) get closed too soon
+      (deref p2)
+      (log/info "...done!")))
 
-  (let [ids [:foo1 :bar1 :baz1 :foo2 :bar2 :baz2 :foo3 :bar3 :baz3 :foo4]
-        period 3 ;; sec
-        chunk 3
-        chan (chan chunk)
-        ses (Executors/newScheduledThreadPool 1)
-        ]
-    (looping-invoke chan print-ids)
-    (do-per-chunk (partial put-in chan) ids ses period chunk))
 
-  (let [ids [:foo1 :bar1 :baz1 :foo2 :bar2 :baz2 :foo3 :bar3 :baz3 :foo4]
-        period 3 ;; sec
-        grouping 3
-        ses (Executors/newScheduledThreadPool 1)
-        completion (do-per-chunk print-ids ids ses period grouping)]
-    (println ".....awaiting completion.....")
-    (deref completion)
-    (println ".....done!"))
+  ;; logging weirdness
+  (log/info "log something standard")
+  (future (log/info "log something async"))
+  (go (log/info "log something go block"))
+  ;; only this last one prints to the repl (all four print to cider buffer)
+  (let [ses (Executors/newScheduledThreadPool 1)]
+    (.submit ses ^Runnable (fn [] (log/info "log something using Executor"))))
+
 
   )
