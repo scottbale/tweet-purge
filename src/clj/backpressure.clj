@@ -31,15 +31,21 @@
       (do-next-chunk coll)
       completion)))
 
-(defn put-in [chan x]
-  (go (>! chan x)))
+(defn put-in [chan coll]
+  (go
+    (doseq [x coll]
+      (>! chan x))))
 
 (defn looping-invoke [chan f finished]
   (go-loop [x (<! chan)]
     (if (= x :done)
       (deliver finished true)
       (do
-        (f x)
+        (try
+          (f x)
+          (catch Exception e
+            (log/warnf #_e "Caught exception, re-enqueuing %s" x)
+            (>! chan x)))
         (recur (<! chan))))))
 
 (defn backpressure-env [task-count]
@@ -66,10 +72,21 @@
 
 ;; sample function(s)
 
+(defn maybe-throw [error-cnt]
+  (when (and
+         (< 0 @error-cnt)
+         (= 0 (rand-int 5)))
+    (swap! error-cnt dec)
+    (throw (Exception. "blammo!"))))
+
 (defn print-id [id]
-  (log/infof "About to print id %s..." id)
   (println ">>>>>>>>" id)
   id)
+
+(defn maybe-print-id [error-cnt id]
+  (log/debugf "Maybe print id %s..." id)
+  (maybe-throw error-cnt)
+  (print-id id))
 
 (defn log-id [writer id]
   (binding [*out* writer]
@@ -77,22 +94,24 @@
     (println id)
     id))
 
-(defn print-and-log-ids [writer ids]
-  (let [f (comp (partial log-id writer) print-id)]
-    (doall (map f ids))))
+(defn maybe-print-and-log-id [error-cnt writer id]
+  (maybe-print-id error-cnt id)
+  (log-id writer id))
 
 
 (comment
 
   (with-open [w1 (io/writer "tweets.log" :append true)
               w2 (io/writer "likes.log" :append true)]
-    (let [env (backpressure-env 2)
+    (let [error-cnt (atom 3) ;; at most three errors
+          env (backpressure-env 2)
           b1 (backpressure env 5 3)
           b2 (backpressure env 3 5)
-          tweets (take 25 (map #(str "foo" %) (range)))
-          likes (take 32 (map #(str "bar" %) (range)))
-          p1 (with-backpressure b1 (partial print-and-log-ids w1) tweets)
-          p2 (with-backpressure b2 (partial print-and-log-ids w2) likes)]
+          tweets (take 15 (map #(str "foo" %) (range)))
+          likes (take 22 (map #(str "bar" %) (range)))
+          p1 (with-backpressure b1 (comp (partial log-id w1) (partial maybe-print-id error-cnt))
+               tweets)
+          p2 (with-backpressure b2 (partial maybe-print-and-log-id error-cnt w2) likes)]
       (log/info ".....awaiting completion.....")
       (deref p1) ;; gotta block or else writer(s) get closed too soon
       (deref p2)
