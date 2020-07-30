@@ -122,3 +122,9 @@ got periodic TimerTask thing working in `backpressure` namespace
 
 * just enqueue single id's, not chunk collection of ids (makes retrying simpler)
 * retry with try-catch, simulate exceptions
+
+## 7/29/20
+
+* Dry run tying most everything together but only doing "GET tweet id" via the API.
+* Also tried a `delete!` but with an already deleted tweet, got a `401` response
+* Still TODO: main method somehow accepting tokens and secrets, and possibly input filename

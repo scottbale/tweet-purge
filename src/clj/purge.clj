@@ -28,7 +28,7 @@
     (with-open [rdr (clojure.java.io/reader path)]
       (into [] (filter is-id (line-seq rdr))))))
 
-;; API auth header
+;; Twitter API auth header
 
 (defn nonce 
   "Pseudo-random string made by
@@ -77,19 +77,18 @@
             (%-enc ts)
             (%-enc access-token))))
 
-;; API
+;; Twitter API
 
 (defn handle-response [id response]
   (let [status (:status response)
-        status-str (get-in response [:headers "status"])
-        limit-remaining (get-in response [:headers "x-rate-limit-remaining"])
-        limit-reset (get-in response [:headers "x-rate-limit-reset"])]
-    (log/debugf "http response for id %s: '%s'. Limit remaining: %s" id status-str limit-remaining)
+        reason-phrase (:reason-phrase response)
+        status-str (format "%d %s" status reason-phrase)]
+    (log/debugf "http response for id %s: '%s'" id status-str)
     (case status
       200 id
-      404 (do (log/warnf "%s not found, ignoring" id) id)
+      (401 404) (do (log/warnf "%s not found, ignoring" id) id)
       429 (Exception. "Exceeded rate.")
-      :default (Exception. (format "Unexpected response status: %s" status-str)))))
+      (Exception. (format "Unexpected response status: %s" status-str)))))
 
 (defn get-tweet
   "Get a tweet from twitter"
@@ -116,25 +115,58 @@
                  {
                   :Authorization (oauth-header keys-and-tokens nonce ts 
                                                (oauth-signature keys-and-tokens verb url params))
-                  }}
-        response (client/get url (assoc request :throw-exceptions false))]
+                  }
+                 :throw-exceptions false}
+        response (client/get url request)]
     (handle-response id response)))
-
 
 (defn delete!
   "Delete a tweet from twitter"
-  [id]
+  [{:keys [api-key access-token] :as keys-and-tokens} id]
   (log/debugf "deleting %s..." id)
-  #_(client/post 
-   (format "https://api.twitter.com/1.1/statuses/destroy/%s.json?trim_user=true" id)
-   {:form-params body
-    :content-type :json
-    :oauth-token @token
-    :throw-exceptions false
-    :as :json})
-  
-  
-  )
+  (let [verb "POST"
+        url (format "https://api.twitter.com/1.1/statuses/destroy/%s.json" id)
+        nonce (nonce)
+        ts (timestamp)
+        params ["id" id
+                "oauth_consumer_key" api-key
+                "oauth_nonce" nonce
+                "oauth_signature_method" "HMAC-SHA1"
+                "oauth_timestamp" ts
+                "oauth_token" access-token
+                "oauth_version" "1.0"
+                "trim_user" "true"]
+        request {:accept :json
+                 :content-type :json
+                 :query-params {"trim_user" "true"}
+                 :headers
+                 {
+                  :Authorization (oauth-header keys-and-tokens nonce ts
+                                               (oauth-signature keys-and-tokens verb url params))
+                  }
+                 :throw-exceptions false}
+        response (client/post url request)]
+    (handle-response id response)))
+
+;; main functions
+
+(defn do-for-all-tweets [keys-and-tokens f]
+  (with-open [done (io/writer "tweets.log")
+              to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
+    (let [chunk 900
+          period (* 60 15) ;; 15 minutes
+          env (bp/backpressure-env 1)
+          bp (bp/backpressure env period chunk)
+          tweets (line-seq to-purge)
+          pr (bp/with-backpressure bp
+               (comp (partial bp/log-id done) (partial f keys-and-tokens))
+               tweets)]
+      (log/info ".....awaiting completion.....")
+      (deref pr) ;; gotta block or else writer(s) get closed too soon
+      (log/info "...done!"))))
+
+(defn get-all-tweets [keys-and-tokens]
+  (do-for-all-tweets keys-and-tokens get-tweet))
 
 (comment
 
@@ -154,7 +186,7 @@
   ;; two
   (let [;;id "1194396125861699590"
         id "1126617623985135618"]
-    (get-tweet scratch/keys-and-tokens id))
+    (delete! scratch/keys-and-tokens id))
 
   ;; three
   (with-open [done (io/writer "tweets.log")
@@ -172,40 +204,7 @@
       (log/info "...done!")))
 
 
-  (let [keys-and-tokens {:api-key "TODO"
-                         :api-secret "TODO"
-                         :access-token "TODO"
-                         :token-secret "TODO"}
-        id "TODO"
-        ;; params ["trim_user" "true"]
-        verb "GET"
-        url "https://api.twitter.com/1.1/statuses/show.json"
-        nonce (nonce)
-        ts (timestamp)
-        params ["id" id 
-                "oauth_consumer_key" (keys-and-tokens :api-key)
-                "oauth_nonce" nonce 
-                "oauth_signature_method" "HMAC-SHA1"
-                "oauth_timestamp" ts
-                "oauth_token" (keys-and-tokens :access-token)
-                "oauth_version" "1.0"]
-        ] 
 
-    ;; (param-str params)
-
-    ;; (base-signature-str verb url params)
-
-    ;; (oauth-signature keys-and-tokens verb url params)
-
-    #_(oauth-header 
-     keys-and-tokens
-     nonce 
-     ts 
-     (oauth-signature keys-and-tokens verb url params))
-
-    (get-tweet keys-and-tokens id)
-
-    )
 
   (tweet-ids-to-delete)
   (tweet-ids-to-keep)
@@ -215,23 +214,8 @@
         ids-purged (tweet-ids-purged)
         ids-to-ignore (into ids-purged ids-to-keep)
         ]
-    
+
     )
 
-  (let [encoder (Base64/getEncoder)]
-    (.encodeToString encoder (.getBytes "foo")))
-
-  ;; new HmacUtils(HmacAlgorithms.HMAC_SHA_1, key).hmacHex(string_to_sign)
-
-  (let [key "foo"
-        val "bar"
-        encoder (Base64/getEncoder)] 
-    (.encodeToString encoder (.hmac (HmacUtils. HmacAlgorithms/HMAC_SHA_1 key)  val)) 
-    )
-
-  (%-enc "foo/bar")
-
-  ;; return ByteBuffer.allocate(4).putFloat(value).array();
-  ;; System/currentTimeMillis
 
   )
