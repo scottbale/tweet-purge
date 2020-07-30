@@ -16,19 +16,18 @@
   time is measured from the end of the function invocation."
   [{:keys [executor period chunk] :as env} f coll]
   (let [completion (promise)]
-    (letfn [(do-next-chunk [xs]
-              (log/trace "next-chunk: xs" xs)
+    (letfn [(do-next-chunk [xs chunk-nm]
+              (log/debugf "starting %d chunk" chunk-nm)
               (let [some-xs (take chunk xs)
                     rest-xs (drop chunk xs)]
-                (log/trace "next-chunk: scheduling" some-xs)
+                (log/trace "next chunk %d: scheduling" chunk-nm)
                 (schedule (fn []
-                            (log/trace "next-chunk: fn" some-xs)
                             (f some-xs)
                             (if (seq rest-xs)
-                              (do-next-chunk rest-xs)
+                              (do-next-chunk rest-xs (inc chunk-nm))
                               (deliver completion true)))
                           executor period)))]
-      (do-next-chunk coll)
+      (do-next-chunk coll 0)
       completion)))
 
 (defn put-in [chan coll]
@@ -64,9 +63,9 @@
     (looping-invoke chan f finished)
     (.submit executor
              (fn []
-               (log/debug "awaiting chunking...")
+               (log/info "awaiting chunking...")
                (deref chunking)
-               (log/debug "chunking done, notifying chan...")
+               (log/info "chunking done, notifying chan...")
                (>!! chan :done)))
     finished))
 
@@ -80,6 +79,7 @@
     (throw (Exception. "blammo!"))))
 
 (defn print-id [id]
+  (log/debugf "print id %s..." id)
   (println ">>>>>>>>" id)
   id)
 

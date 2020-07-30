@@ -1,6 +1,8 @@
 (ns purge
   (:require
+   [backpressure :as bp]
    [clj-http.client :as client]
+   [clojure.java.io :as io]
    [clojure.tools.logging :as log])
   (:import
    [java.net URLEncoder]
@@ -77,35 +79,46 @@
 
 ;; API
 
+(defn handle-response [id response]
+  (let [status (:status response)
+        status-str (get-in response [:headers "status"])
+        limit-remaining (get-in response [:headers "x-rate-limit-remaining"])
+        limit-reset (get-in response [:headers "x-rate-limit-reset"])]
+    (log/debugf "http response for id %s: '%s'. Limit remaining: %s" id status-str limit-remaining)
+    (case status
+      200 id
+      404 (do (log/warnf "%s not found, ignoring" id) id)
+      429 (Exception. "Exceeded rate.")
+      :default (Exception. (format "Unexpected response status: %s" status-str)))))
+
 (defn get-tweet
   "Get a tweet from twitter"
   [{:keys [api-key access-token] :as keys-and-tokens} id]
-  (log/debugf "getting %s..." id)
+  (log/debugf "requesting %s..." id)
   (let [verb "GET"
         url "https://api.twitter.com/1.1/statuses/show.json"
         nonce (nonce)
         ts (timestamp)
         params ["id" id
+                "include_entities" "false"
                 "oauth_consumer_key" api-key
                 "oauth_nonce" nonce 
                 "oauth_signature_method" "HMAC-SHA1"
                 "oauth_timestamp" ts
                 "oauth_token" access-token
-                "oauth_version" "1.0"]
+                "oauth_version" "1.0"
+                "trim_user" "true"]
         request {:accept :json
-                 :query-params {"id" id}
-                 :headers 
+                 :query-params (select-keys
+                                (apply assoc {} params)
+                                ["id" "include_entities" "trim_user"])
+                 :headers
                  {
                   :Authorization (oauth-header keys-and-tokens nonce ts 
                                                (oauth-signature keys-and-tokens verb url params))
-                  }
-                 }
-        ;; _ (log/debug "request>>>>>>" request)
-        response (client/get url (assoc request :debug true :debug-body true))
-        ]
-    (log/debug "response>>>>>>>>" response)
-    response)
-  )
+                  }}
+        response (client/get url (assoc request :throw-exceptions false))]
+    (handle-response id response)))
 
 
 (defn delete!
@@ -124,6 +137,40 @@
   )
 
 (comment
+
+  ;; one
+  (with-open [done (io/writer "tweets.log" :append true)
+              to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
+    (let [chunk 500
+          period 10
+          env (bp/backpressure-env 1)
+          bp (bp/backpressure env period chunk)
+          tweets (line-seq to-purge)
+          pr (bp/with-backpressure bp (comp (partial bp/log-id done) bp/print-id) tweets)]
+      (log/info ".....awaiting completion.....")
+      (deref pr) ;; gotta block or else writer(s) get closed too soon
+      (log/info "...done!")))
+
+  ;; two
+  (let [;;id "1194396125861699590"
+        id "1126617623985135618"]
+    (get-tweet scratch/keys-and-tokens id))
+
+  ;; three
+  (with-open [done (io/writer "tweets.log")
+              to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
+    (let [chunk 10
+          period 10
+          env (bp/backpressure-env 1)
+          bp (bp/backpressure env period chunk)
+          tweets (take 1000 (line-seq to-purge))
+          pr (bp/with-backpressure bp
+               (comp (partial bp/log-id done) (partial get-tweet scratch/keys-and-tokens))
+               tweets)]
+      (log/info ".....awaiting completion.....")
+      (deref pr) ;; gotta block or else writer(s) get closed too soon
+      (log/info "...done!")))
+
 
   (let [keys-and-tokens {:api-key "TODO"
                          :api-secret "TODO"
