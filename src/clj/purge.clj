@@ -3,12 +3,7 @@
    [backpressure :as bp]
    [clj-http.client :as client]
    [clojure.java.io :as io]
-   [clojure.tools.logging :as log])
-  (:import
-   [java.net URLEncoder]
-   [java.nio ByteBuffer]
-   [java.util Base64]
-   [org.apache.commons.codec.digest HmacUtils HmacAlgorithms]))
+   [clojure.tools.logging :as log]))
 
 (defn tweet-ids-to-delete []
   (let [path "/Users/scottbale/personal/twitter/purge.txt"] 
@@ -28,57 +23,6 @@
     (with-open [rdr (clojure.java.io/reader path)]
       (into [] (filter is-id (line-seq rdr))))))
 
-;; Twitter API auth header
-
-(defn nonce 
-  "Pseudo-random string made by
-  1. 32 bytes of random data (8 invocations of rand, each returning a float)
-  2. Add each to a ByteBuffer of size 32
-  3. base64-encode the resulting byte array
-  4. remove any +, /, = characters"
-  [] 
-  (let [bb (ByteBuffer/allocate 32)
-        encoder (Base64/getEncoder)]
-    (dotimes [_ 8] (.putFloat bb (rand)))
-    (let [encoded-str (.encodeToString encoder (.array bb))]
-      (apply str (remove #(#{\+ \/ \=} %) encoded-str)))))
-
-(defn timestamp []
-  (str (long (/ (System/currentTimeMillis) 1000))))
-
-(defn %-enc [x] (URLEncoder/encode x "UTF-8"))
-
-(defn param-str [params]
-  (loop [[k v & ps :as all] params
-         result []]
-    (if (seq all)
-      (recur ps (conj result "&" (%-enc k) "=" (%-enc v)))
-      (apply str (rest result)))))
-
-(defn base-signature-str [verb url params]
-  (if (seq params)
-    (str verb "&" (%-enc url) "&" (%-enc (param-str params)))
-    (str verb "&" (%-enc url))))
-
-(defn oauth-signature [{:keys [api-secret token-secret]} verb url params]
-  (let [base-sig (base-signature-str verb url params)
-        signing-key (str (%-enc api-secret) "&" (%-enc token-secret))
-        encoder (Base64/getEncoder)]
-    (.encodeToString encoder (.hmac (HmacUtils. HmacAlgorithms/HMAC_SHA_1 signing-key) base-sig))))
-
-(defn oauth-header 
-  "Returns oauth header string, given necessary params"
-  [{:keys [api-key access-token]} nonce ts signature]
-  (let [template "OAuth oauth_consumer_key=\"%s\", oauth_nonce=\"%s\", oauth_signature=\"%s\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"%s\", oauth_token=\"%s\", oauth_version=\"1.0\""]
-    (format template 
-            (%-enc api-key)
-            (%-enc nonce) 
-            (%-enc signature) 
-            (%-enc ts)
-            (%-enc access-token))))
-
-;; Twitter API
-
 (defn handle-response [id response]
   (let [status (:status response)
         reason-phrase (:reason-phrase response)
@@ -96,8 +40,8 @@
   (log/debugf "requesting %s..." id)
   (let [verb "GET"
         url "https://api.twitter.com/1.1/statuses/show.json"
-        nonce (nonce)
-        ts (timestamp)
+        nonce (oauth/nonce)
+        ts (oauth/timestamp)
         params ["id" id
                 "include_entities" "false"
                 "oauth_consumer_key" api-key
@@ -113,8 +57,8 @@
                                 ["id" "include_entities" "trim_user"])
                  :headers
                  {
-                  :Authorization (oauth-header keys-and-tokens nonce ts 
-                                               (oauth-signature keys-and-tokens verb url params))
+                  :Authorization (oauth/header keys-and-tokens nonce ts 
+                                               (oauth/signature keys-and-tokens verb url params))
                   }
                  :throw-exceptions false}
         response (client/get url request)]
@@ -126,8 +70,8 @@
   (log/debugf "deleting %s..." id)
   (let [verb "POST"
         url (format "https://api.twitter.com/1.1/statuses/destroy/%s.json" id)
-        nonce (nonce)
-        ts (timestamp)
+        nonce (oauth/nonce)
+        ts (oauth/timestamp)
         params ["id" id
                 "oauth_consumer_key" api-key
                 "oauth_nonce" nonce
@@ -141,8 +85,8 @@
                  :query-params {"trim_user" "true"}
                  :headers
                  {
-                  :Authorization (oauth-header keys-and-tokens nonce ts
-                                               (oauth-signature keys-and-tokens verb url params))
+                  :Authorization (oauth/header keys-and-tokens nonce ts
+                                               (oauth/signature keys-and-tokens verb url params))
                   }
                  :throw-exceptions false}
         response (client/post url request)]
@@ -150,15 +94,11 @@
 
 ;; main functions
 
-(defn do-for-all-tweets [keys-and-tokens f]
+(defn do-for-all-tweets [keys-and-tokens backpressure f]
   (with-open [done (io/writer "tweets.log")
               to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
-    (let [chunk 900
-          period (* 60 15) ;; 15 minutes
-          env (bp/backpressure-env 1)
-          bp (bp/backpressure env period chunk)
-          tweets (line-seq to-purge)
-          pr (bp/with-backpressure bp
+    (let [tweets (line-seq to-purge)
+          pr (bp/with-backpressure backpressure
                (comp (partial bp/log-id done) (partial f keys-and-tokens))
                tweets)]
       (log/info ".....awaiting completion.....")
@@ -166,7 +106,11 @@
       (log/info "...done!"))))
 
 (defn get-all-tweets [keys-and-tokens]
-  (do-for-all-tweets keys-and-tokens get-tweet))
+  (let [chunk 900
+        period (* 60 15) ;; 15 minutes rate limit
+        env (bp/backpressure-env 1)
+        bp (bp/backpressure env period chunk)] 
+    (do-for-all-tweets keys-and-tokens bp get-tweet)))
 
 (comment
 

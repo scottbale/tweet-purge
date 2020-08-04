@@ -14,7 +14,7 @@
   which will be completed when all chunks are completed. Use provided ScheduledExecutorService. f
   should be a function of a single arg, which is a collection of at most length equal to chunk. The
   time is measured from the end of the function invocation."
-  [{:keys [executor period chunk] :as env} f coll]
+  [{:keys [executor period chunk]} f coll]
   (let [completion (promise)]
     (letfn [(do-next-chunk [xs chunk-nm]
               (log/debugf "starting %d chunk" chunk-nm)
@@ -55,11 +55,11 @@
 
 (defn with-backpressure
   "Asynchronously execute f on successive chunks of collection coll, returning a Promise.
-  Environment will indicate chunk size and period, in seconds, in between each chunk."
-  [{:keys [executor period chunk] :as env} f coll]
+  Backpressure map will indicate chunk size and period, in seconds, in between each chunk."
+  [{:keys [executor chunk] :as backpressure} f coll]
   (let [chan (chan chunk)
         finished (promise)
-        chunking (do-per-chunk env (partial put-in chan) coll)]
+        chunking (do-per-chunk backpressure (partial put-in chan) coll)]
     (looping-invoke chan f finished)
     (.submit executor
              (fn []

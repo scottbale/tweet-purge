@@ -128,3 +128,8 @@ got periodic TimerTask thing working in `backpressure` namespace
 * Dry run tying most everything together but only doing "GET tweet id" via the API.
 * Also tried a `delete!` but with an already deleted tweet, got a `401` response
 * Still TODO: main method somehow accepting tokens and secrets, and possibly input filename
+
+## 8/4/20
+
+* Put oauth functions in their own namespace
+* Make `backpressure` map a param to `do-for-all-tweets`
