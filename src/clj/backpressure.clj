@@ -1,6 +1,6 @@
 (ns backpressure
   (:require
-   [clojure.core.async :refer [chan go go-loop <! >! >!!]]
+   [clojure.core.async :refer [chan go go-loop >! >!! alts!]]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log])
   (:import
@@ -35,8 +35,8 @@
     (doseq [x coll]
       (>! chan x))))
 
-(defn looping-invoke [chan f finished]
-  (go-loop [x (<! chan)]
+(defn looping-invoke [queue chunk-done f finished]
+  (go-loop [x (alts! queue chunk-done :priority true)]
     (if (= x :done)
       (deliver finished true)
       (do
@@ -45,7 +45,7 @@
           (catch Exception e
             (log/warnf #_e "Caught exception, re-enqueuing %s" x)
             (>! chan x)))
-        (recur (<! chan))))))
+        (recur (alts! queue chunk-done :priority true))))))
 
 (defn backpressure-env [task-count]
   {:executor (Executors/newScheduledThreadPool (+ 2 task-count))})
@@ -57,16 +57,17 @@
   "Asynchronously execute f on successive chunks of collection coll, returning a Promise.
   Backpressure map will indicate chunk size and period, in seconds, in between each chunk."
   [{:keys [executor chunk] :as backpressure} f coll]
-  (let [chan (chan chunk)
+  (let [queue (chan chunk)
+        chunk-done (chan 1)
         finished (promise)
-        chunking (do-per-chunk backpressure (partial put-in chan) coll)]
-    (looping-invoke chan f finished)
+        chunking (do-per-chunk backpressure (partial put-in queue) coll)]
+    (looping-invoke queue chunk-done f finished)
     (.submit executor
              (fn []
                (log/info "awaiting chunking...")
                (deref chunking)
                (log/info "chunking done, notifying chan...")
-               (>!! chan :done)))
+               (>!! chunk-done :done)))
     finished))
 
 ;; sample function(s)
