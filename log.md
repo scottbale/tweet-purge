@@ -133,3 +133,4 @@ got periodic TimerTask thing working in `backpressure` namespace
 
 * Put oauth functions in their own namespace
 * Make `backpressure` map a param to `do-for-all-tweets`
+* Put python scripts in `bin` dir
