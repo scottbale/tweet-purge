@@ -142,6 +142,7 @@ got periodic TimerTask thing working in `backpressure` namespace
 * bug fixes in `backpressure` around `alts!`
 * trying to kick off the real delete all... I fear rate limit is 300 per 3 hours, which will take my
   program over 24 hours :(
+* bug fix in `backpressure`: do the first chunk immediately
 
 ## Appendix
 

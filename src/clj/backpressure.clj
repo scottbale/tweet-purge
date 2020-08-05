@@ -10,23 +10,23 @@
   (.schedule scheduled-executor-service f seconds TimeUnit/SECONDS))
 
 (defn do-per-chunk
-  "Execute function f for each chunk of collection `coll` after `period` seconds. Return a Promise
-  which will be completed when all chunks are completed. Use provided ScheduledExecutorService. f
-  should be a function of a single arg, which is a collection of at most length equal to chunk. The
-  time is measured from the end of the function invocation."
+  "Execute function f for each chunk of collection `coll`. First chunk is executed immediately, each
+  subsequent one after `period` seconds. Return a Promise which will be completed when all chunks
+  are completed. Uses provided ScheduledExecutorService. f should be a function of a single arg,
+  which is a collection of at most length equal to chunk. The time is measured from the end of the
+  function invocation."
   [{:keys [executor period chunk]} f coll]
   (let [completion (promise)]
     (letfn [(do-next-chunk [xs chunk-nm]
               (log/debugf "starting %d chunk" chunk-nm)
               (let [some-xs (take chunk xs)
                     rest-xs (drop chunk xs)]
-                (log/trace "next chunk %d: scheduling" chunk-nm)
-                (schedule (fn []
-                            (f some-xs)
-                            (if (seq rest-xs)
-                              (do-next-chunk rest-xs (inc chunk-nm))
-                              (deliver completion true)))
-                          executor period)))]
+                (f some-xs)
+                (if (seq rest-xs)
+                  (do
+                    (log/trace "next chunk %d: scheduling" chunk-nm)
+                    (schedule #(do-next-chunk rest-xs (inc chunk-nm)) executor period))
+                  (deliver completion true))))]
       (do-next-chunk coll 0)
       completion)))
 
@@ -106,7 +106,9 @@
   (with-open [w1 (io/writer "tweets.log")]
     (let [error-cnt (atom 3) ;; at most three errors
           env (backpressure-env 1)
-          b1 (backpressure env 5 3)
+          period (* 60 3) ;; 3 minutes
+          chunk 10
+          b1 (backpressure env period chunk)
           tweets (take 15 (map #(str "foo" %) (range)))
           p1 (with-backpressure b1 (comp (partial log-id w1) (partial maybe-print-id error-cnt))
                tweets)]
