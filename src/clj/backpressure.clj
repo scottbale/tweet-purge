@@ -36,7 +36,7 @@
       (>! chan x))))
 
 (defn looping-invoke [queue chunk-done f finished]
-  (go-loop [x (alts! queue chunk-done :priority true)]
+  (go-loop [[x _] (alts! [queue chunk-done] :priority true)]
     (if (= x :done)
       (deliver finished true)
       (do
@@ -44,8 +44,8 @@
           (f x)
           (catch Exception e
             (log/warnf #_e "Caught exception, re-enqueuing %s" x)
-            (>! chan x)))
-        (recur (alts! queue chunk-done :priority true))))))
+            (>! queue x)))
+        (recur (alts! [queue chunk-done] :priority true))))))
 
 (defn backpressure-env [task-count]
   {:executor (Executors/newScheduledThreadPool (+ 2 task-count))})
@@ -102,6 +102,19 @@
 
 (comment
 
+  ;; zero
+  (with-open [w1 (io/writer "tweets.log")]
+    (let [error-cnt (atom 3) ;; at most three errors
+          env (backpressure-env 1)
+          b1 (backpressure env 5 3)
+          tweets (take 15 (map #(str "foo" %) (range)))
+          p1 (with-backpressure b1 (comp (partial log-id w1) (partial maybe-print-id error-cnt))
+               tweets)]
+      (log/info ".....awaiting completion.....")
+      (deref p1) ;; gotta block or else writer(s) get closed too soon
+      (log/info "...done!")))
+
+  ;; one
   (with-open [w1 (io/writer "tweets.log" :append true)
               w2 (io/writer "likes.log" :append true)]
     (let [error-cnt (atom 3) ;; at most three errors

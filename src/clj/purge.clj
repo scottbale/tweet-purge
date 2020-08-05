@@ -12,8 +12,9 @@
     (log/debugf "http response for id %s: '%s'" id status-str)
     (case status
       200 id
-      (401 404) (do (log/warnf "%s not found, ignoring" id) id)
+      404 (do (log/warnf "%s not found, ignoring" id) id)
       429 (Exception. "Exceeded rate.")
+      401 (Exception. (format "Unauthorized: %s" status-str))
       (Exception. (format "Unexpected response status: %s" status-str)))))
 
 (defn get-tweet
@@ -51,7 +52,7 @@
   [{:keys [api-key access-token] :as keys-and-tokens} id]
   (log/debugf "deleting %s..." id)
   (let [verb "POST"
-        url (format "https://api.twitter.com/1.1/statuses/destroy/%s.json" id)
+        url "https://api.twitter.com/1.1/statuses/destroy.json"
         nonce (oauth/nonce)
         ts (oauth/timestamp)
         params ["id" id
@@ -64,7 +65,7 @@
                 "trim_user" "true"]
         request {:accept :json
                  :content-type :json
-                 :query-params {"trim_user" "true"}
+                 :query-params {"id" id "trim_user" "true"}
                  :headers
                  {
                   :Authorization (oauth/header keys-and-tokens nonce ts
@@ -94,7 +95,17 @@
         bp (bp/backpressure env period chunk)] 
     (do-for-all-tweets keys-and-tokens bp get-tweet)))
 
+(defn delete-all-tweets! [keys-and-tokens]
+  (let [chunk 300
+        period (* 60 15) ;; 15 minutes rate limit
+        env (bp/backpressure-env 1)
+        bp (bp/backpressure env period chunk)]
+    (do-for-all-tweets keys-and-tokens bp delete!)))
+
 (comment
+
+  ;; zero
+  (delete-all-tweets! scratch/keys-and-tokens)
 
   ;; one
   (with-open [done (io/writer "tweets.log" :append true)
@@ -110,9 +121,14 @@
       (log/info "...done!")))
 
   ;; two
-  (let [;;id "1194396125861699590"
-        id "1126617623985135618"]
+  (let [id "1194396125861699590"
+        ;;id "115814863581876225"
+        ]
     (delete! scratch/keys-and-tokens id))
+
+  ;; four
+  (let [id "115814863581876225"]
+    (get-tweet scratch/keys-and-tokens id))
 
   ;; three
   (with-open [done (io/writer "tweets.log")

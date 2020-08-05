@@ -135,3 +135,69 @@ got periodic TimerTask thing working in `backpressure` namespace
 * Make `backpressure` map a param to `do-for-all-tweets`
 * Put python scripts in `bin` dir
 * Did todo with `alts!`
+
+## 8/5/20
+
+* bug fixes in `purge` around properly formatting url and request for delete
+* bug fixes in `backpressure` around `alts!`
+* trying to kick off the real delete all... I fear rate limit is 300 per 3 hours, which will take my
+  program over 24 hours :(
+
+## Appendix
+
+sample delete response
+
+    {:cached nil,
+     :request-time 634,
+     :repeatable? false,
+     :protocol-version {:name "HTTP", :major 1, :minor 1},
+     :streaming? true,
+     :http-client
+     #object[org.apache.http.impl.client.InternalHttpClient 0x50d21cdd "org.apache.http.impl.client.InternalHttpClient@50d21cdd"],
+     :chunked? false,
+     :cookies
+     {"personalization_id"
+      {:discard false,
+       :domain "twitter.com",
+       :expires #inst "2022-08-05T15:27:03.305-00:00",
+       :path "/",
+       :secure true,
+       :value "\"redacted\"",
+       :version 0},
+      "lang" {:discard true, :path "/", :secure false, :value "en", :version 0},
+      "guest_id"
+      {:discard false,
+       :domain "twitter.com",
+       :expires #inst "2022-08-05T15:27:03.305-00:00",
+       :path "/",
+       :secure true,
+       :value "redacted",
+       :version 0}},
+     :reason-phrase "OK",
+     :headers
+     {"server" "tsa_b",
+      "x-twitter-response-tags" "BouncerCompliant",
+      "content-type" "application/json;charset=utf-8",
+      "x-content-type-options" "nosniff",
+      "content-length" "587",
+      "x-connection-hash" "redacted",
+      "x-frame-options" "SAMEORIGIN",
+      "strict-transport-security" "max-age=631138519",
+      "connection" "close",
+      "x-response-time" "55",
+      "pragma" "no-cache",
+      "status" "200 OK",
+      "expires" "Tue, 31 Mar 1981 05:00:00 GMT",
+      "date" "Wed, 05 Aug 2020 15:27:02 GMT",
+      "content-disposition" "attachment; filename=json.json",
+      "last-modified" "Wed, 05 Aug 2020 15:27:02 GMT",
+      "x-access-level" "read-write",
+      "x-xss-protection" "0",
+      "cache-control" "no-cache, no-store, must-revalidate, pre-check=0, post-check=0",
+      "x-transaction" "007f7e670034f3d2"},
+     :orig-content-encoding "gzip",
+     :status 200,
+     :length 587,
+     :body
+     "{\"created_at\":\"Tue Nov 12 23:26:41 +0000 2019\",\"id\":1194396125861699590,\"id_str\":\"1194396125861699590\",\"text\":\"RT @rsa: Sometimes I get close to rethinking every decision I ever made in my life \\u2013 and then I realize that I just need coffee.\",\"truncated\":false,\"entities\":{\"hashtags\":[],\"symbols\":[],\"user_mentions\":[{\"screen_name\":\"rsa\",\"name\":\"rsa\",\"id\":6735,\"id_str\":\"6735\",\"indices\":[3,7]}],\"urls\":[]},\"source\":\"\\u003ca href=\\\"https:\\/\\/mobile.twitter.com\\\" rel=\\\"nofollow\\\"\\u003eTwitter Web App\\u003c\\/a\\u003e\",\"in_reply_to_status_id\":null,\"in_reply_to_status_id_str\":null,\"in_reply_to_user_id\":null,\"in_reply_to_user_id_str\":null,\"in_reply_to_screen_name\":null,\"user\":{\"id\":15001217,\"id_str\":\"15001217\"},\"geo\":null,\"coordinates\":null,\"place\":null,\"contributors\":null,\"retweeted_status\":{\"created_at\":\"Sat Sep 03 20:19:55 +0000 2011\",\"id\":110084629926658048,\"id_str\":\"110084629926658048\",\"text\":\"Sometimes I get close to rethinking every decision I ever made in my life \\u2013 and then I realize that I just need coffee.\",\"truncated\":false,\"entities\":{\"hashtags\":[],\"symbols\":[],\"user_mentions\":[],\"urls\":[]},\"source\":\"\\u003ca href=\\\"http:\\/\\/twitter.com\\\" rel=\\\"nofollow\\\"\\u003eTwitter Web Client\\u003c\\/a\\u003e\",\"in_reply_to_status_id\":null,\"in_reply_to_status_id_str\":null,\"in_reply_to_user_id\":null,\"in_reply_to_user_id_str\":null,\"in_reply_to_screen_name\":null,\"user\":{\"id\":6735,\"id_str\":\"6735\"},\"geo\":null,\"coordinates\":null,\"place\":null,\"contributors\":null,\"is_quote_status\":false,\"retweet_count\":14,\"favorite_count\":27,\"favorited\":false,\"retweeted\":true,\"lang\":\"en\"},\"is_quote_status\":false,\"retweet_count\":14,\"favorite_count\":0,\"favorited\":false,\"retweeted\":true,\"lang\":\"en\"}",
+     :trace-redirects []}
