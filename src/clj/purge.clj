@@ -5,24 +5,6 @@
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]))
 
-(defn tweet-ids-to-delete []
-  (let [path "/Users/scottbale/personal/twitter/purge.txt"] 
-    (with-open [rdr (clojure.java.io/reader path)]
-      (into [] (line-seq rdr)))))
-
-(defn tweet-ids-purged []
-  (let [path "/Users/scottbale/personal/twitter/purged.txt"] 
-    (with-open [rdr (clojure.java.io/reader path)]
-      (into #{} (line-seq rdr)))))
-
-(defn is-id [^String line]
-  (and (seq line) (not (.startsWith line "#"))))
-
-(defn tweet-ids-to-keep []
-  (let [path "/Users/scottbale/personal/twitter/keep.txt"] 
-    (with-open [rdr (clojure.java.io/reader path)]
-      (into [] (filter is-id (line-seq rdr))))))
-
 (defn handle-response [id response]
   (let [status (:status response)
         reason-phrase (:reason-phrase response)
@@ -148,10 +130,28 @@
       (log/info "...done!")))
 
 
+  (defn tweet-ids-to-delete []
+    (let [path "/Users/scottbale/personal/twitter/purge.txt"]
+      (with-open [rdr (clojure.java.io/reader path)]
+        (into [] (line-seq rdr)))))
+
+  (defn tweet-ids-purged []
+    (let [path "/Users/scottbale/personal/twitter/purged.txt"]
+      (with-open [rdr (clojure.java.io/reader path)]
+        (into #{} (line-seq rdr)))))
+
+  (defn is-id [^String line]
+    (and (seq line) (not (.startsWith line "#"))))
+
+  (defn tweet-ids-to-keep []
+    (let [path "/Users/scottbale/personal/twitter/keep.txt"]
+      (with-open [rdr (clojure.java.io/reader path)]
+        (into [] (filter is-id (line-seq rdr))))))
 
 
-  (tweet-ids-to-delete)
-  (tweet-ids-to-keep)
+
+  (count (tweet-ids-to-delete))
+  (count (tweet-ids-to-keep))
 
   (let [ids (tweet-ids-to-delete)
         ids-to-keep (tweet-ids-to-keep) 
