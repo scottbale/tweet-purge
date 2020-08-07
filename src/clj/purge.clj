@@ -77,74 +77,46 @@
 
 ;; main functions
 
-(defn do-for-all-tweets [keys-and-tokens backpressure f]
-  (with-open [done-w (io/writer "tweets.log")
-              retry-w (io/writer "retry.log")
-              to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
+(defn do-for-all-tweets [{:keys [tweets-file success-file retry-file] :as env} backpressure f]
+  (with-open [done-w (io/writer success-file)
+              retry-w (io/writer retry-file)
+              to-purge (io/reader tweets-file)]
     (let [tweets (line-seq to-purge)
           pr (bp/with-backpressure backpressure
-               (bp/id-try-catch-logging (partial f keys-and-tokens) done-w retry-w)
+               (bp/id-try-catch-logging (partial f env) done-w retry-w)
                tweets)]
       (log/info ".....awaiting completion.....")
       (deref pr) ;; gotta block or else writer(s) get closed too soon
       (log/info "...done!"))))
 
-(defn get-all-tweets [keys-and-tokens]
+(defn get-all-tweets [env]
   (let [chunk 900
         period (* 60 15) ;; 15 minutes rate limit
         env (bp/backpressure-env 1)
         bp (bp/backpressure env period chunk)] 
-    (do-for-all-tweets keys-and-tokens bp get-tweet)))
+    (do-for-all-tweets env bp get-tweet)))
 
-(defn delete-all-tweets! [keys-and-tokens]
+(defn delete-all-tweets! [env]
   (let [chunk 300
         period (* 60 15) ;; 15 minutes rate limit
         env (bp/backpressure-env 1)
         bp (bp/backpressure env period chunk)]
-    (do-for-all-tweets keys-and-tokens bp delete!)))
+    (do-for-all-tweets env bp delete!)))
 
 (comment
 
   ;; zero
-  (delete-all-tweets! scratch/keys-and-tokens)
-
-  ;; one
-  (with-open [done (io/writer "tweets.log" :append true)
-              to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
-    (let [chunk 500
-          period 10
-          env (bp/backpressure-env 1)
-          bp (bp/backpressure env period chunk)
-          tweets (line-seq to-purge)
-          pr (bp/with-backpressure bp (comp (partial bp/log-id done) bp/print-id) tweets)]
-      (log/info ".....awaiting completion.....")
-      (deref pr) ;; gotta block or else writer(s) get closed too soon
-      (log/info "...done!")))
+  (delete-all-tweets! scratch/env)
 
   ;; two
   (let [id "1194396125861699590"
         ;;id "115814863581876225"
         ]
-    (delete! scratch/keys-and-tokens id))
+    (delete! scratch/env id))
 
   ;; four
   (let [id "115814863581876225"]
-    (get-tweet scratch/keys-and-tokens id))
-
-  ;; three
-  (with-open [done (io/writer "tweets.log")
-              to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
-    (let [chunk 10
-          period 10
-          env (bp/backpressure-env 1)
-          bp (bp/backpressure env period chunk)
-          tweets (take 1000 (line-seq to-purge))
-          pr (bp/with-backpressure bp
-               (comp (partial bp/log-id done) (partial get-tweet scratch/keys-and-tokens))
-               tweets)]
-      (log/info ".....awaiting completion.....")
-      (deref pr) ;; gotta block or else writer(s) get closed too soon
-      (log/info "...done!")))
+    (get-tweet scratch/env id))
 
 
   (defn tweet-ids-to-delete []

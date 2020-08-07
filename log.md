@@ -148,6 +148,7 @@ got periodic TimerTask thing working in `backpressure` namespace
 
 * Retry messed up, can't put id back in the `queue` because it's likely already at rate limit.
   Punting, just writing retry id's to separate log file. Simplifies some things.
+* moving filename strings to `scratch/env`
 
 ## Appendix
 
