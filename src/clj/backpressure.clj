@@ -1,6 +1,6 @@
 (ns backpressure
   (:require
-   [clojure.core.async :refer [chan go go-loop >! >!! alts!]]
+   [clojure.core.async :refer [chan go go-loop >! >!! <!]]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log])
   (:import
@@ -35,17 +35,13 @@
     (doseq [x coll]
       (>! chan x))))
 
-(defn looping-invoke [queue chunk-done f finished]
-  (go-loop [[x _] (alts! [queue chunk-done] :priority true)]
+(defn looping-invoke [queue f finished]
+  (go-loop [x (<! queue)]
     (if (= x :done)
       (deliver finished true)
       (do
-        (try
-          (f x)
-          (catch Exception e
-            (log/warnf #_e "Caught exception, re-enqueuing %s" x)
-            (>! queue x)))
-        (recur (alts! [queue chunk-done] :priority true))))))
+        (f x)
+        (recur (<! queue))))))
 
 (defn backpressure-env [task-count]
   {:executor (Executors/newScheduledThreadPool (+ 2 task-count))})
@@ -58,16 +54,15 @@
   Backpressure map will indicate chunk size and period, in seconds, in between each chunk."
   [{:keys [executor chunk] :as backpressure} f coll]
   (let [queue (chan chunk)
-        chunk-done (chan 1)
         finished (promise)
         chunking (do-per-chunk backpressure (partial put-in queue) coll)]
-    (looping-invoke queue chunk-done f finished)
+    (looping-invoke queue f finished)
     (.submit executor
              (fn []
                (log/info "awaiting chunking...")
                (deref chunking)
                (log/info "chunking done, notifying chan...")
-               (>!! chunk-done :done)))
+               (>!! queue :done)))
     finished))
 
 ;; sample function(s)
@@ -78,6 +73,16 @@
          (= 0 (rand-int 5)))
     (swap! error-cnt dec)
     (throw (Exception. "blammo!"))))
+
+(defn id-try-catch-logging [f success-writer retry-writer]
+  (fn [id]
+    (try
+      (f id)
+      (log-id success-writer id)
+      (catch Exception e
+        (log/warnf #_e "Caught exception, re-enqueuing %s" id)
+        (log-id retry-writer id)
+        ))))
 
 (defn print-id [id]
   (log/debugf "print id %s..." id)
@@ -103,20 +108,22 @@
 (comment
 
   ;; zero
-  (with-open [w1 (io/writer "tweets.log")]
+  (with-open [done-w (io/writer "tweets.log")
+              retry-w (io/writer "retry.log")]
     (let [error-cnt (atom 3) ;; at most three errors
           env (backpressure-env 1)
           period (* 60 3) ;; 3 minutes
           chunk 10
-          b1 (backpressure env period chunk)
+          bp (backpressure env period chunk)
           tweets (take 15 (map #(str "foo" %) (range)))
-          p1 (with-backpressure b1 (comp (partial log-id w1) (partial maybe-print-id error-cnt))
+          pr (with-backpressure bp
+               (id-try-catch-logging (partial maybe-print-id error-cnt) done-w retry-w)
                tweets)]
       (log/info ".....awaiting completion.....")
-      (deref p1) ;; gotta block or else writer(s) get closed too soon
+      (deref pr) ;; gotta block or else writer(s) get closed too soon
       (log/info "...done!")))
 
-  ;; one
+  ;; one (outdated)
   (with-open [w1 (io/writer "tweets.log" :append true)
               w2 (io/writer "likes.log" :append true)]
     (let [error-cnt (atom 3) ;; at most three errors

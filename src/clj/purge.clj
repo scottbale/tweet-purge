@@ -78,11 +78,12 @@
 ;; main functions
 
 (defn do-for-all-tweets [keys-and-tokens backpressure f]
-  (with-open [done (io/writer "tweets.log")
+  (with-open [done-w (io/writer "tweets.log")
+              retry-w (io/writer "retry.log")
               to-purge (io/reader "/Users/scottbale/personal/twitter/purge.txt")]
     (let [tweets (line-seq to-purge)
           pr (bp/with-backpressure backpressure
-               (comp (partial bp/log-id done) (partial f keys-and-tokens))
+               (bp/id-try-catch-logging (partial f keys-and-tokens) done-w retry-w)
                tweets)]
       (log/info ".....awaiting completion.....")
       (deref pr) ;; gotta block or else writer(s) get closed too soon

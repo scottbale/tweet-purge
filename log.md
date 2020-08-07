@@ -144,6 +144,11 @@ got periodic TimerTask thing working in `backpressure` namespace
   program over 24 hours :(
 * bug fix in `backpressure`: do the first chunk immediately
 
+## 8/6/20
+
+* Retry messed up, can't put id back in the `queue` because it's likely already at rate limit.
+  Punting, just writing retry id's to separate log file. Simplifies some things.
+
 ## Appendix
 
 sample delete response
