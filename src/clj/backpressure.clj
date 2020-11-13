@@ -24,29 +24,44 @@
                 (f some-xs)
                 (if (seq rest-xs)
                   (do
-                    (log/trace "next chunk %d: scheduling" chunk-nm)
+                    (log/tracef "next chunk %d: scheduling" chunk-nm)
                     (schedule #(do-next-chunk rest-xs (inc chunk-nm)) executor period))
                   (deliver completion true))))]
       (do-next-chunk coll 0)
       completion)))
 
-(defn put-in [chan coll]
-  (go
-    (doseq [x coll]
-      (>! chan x))))
+(defn put-in
+  "Synchronously add each of `coll` items to channel"
+  [chan coll]
+  (log/debugf "about to add %d items to chan" (count coll))
+  (doseq [x coll]
+    (log/tracef "(>!! chan %s)" x)
+    (>!! chan x)))
 
-(defn looping-invoke [queue f finished]
+(defn looping-invoke
+  "In a go loop, repeatedly invoke function `f`, passing as a single arg each item retrieved from the
+  channel `queue`. `finished` is a Promise: when `:done` poison pill is retrieved from the chan,
+  deliver `true` to the Promise."
+  [queue f finished]
   (go-loop [x (<! queue)]
+    (log/tracef "(<! chan: %s)" x)
     (if (= x :done)
       (deliver finished true)
       (do
         (f x)
         (recur (<! queue))))))
 
-(defn backpressure-env [task-count]
+(defn backpressure-env
+  "Create a backpressure 'environment' (currently containing a scheduled thread pool Executor which is
+  sized based on `task-count`, number of intended concurrent tasks, and which handles the scheduling
+  of future chunks after a pause)."
+  [task-count]
   {:executor (Executors/newScheduledThreadPool (+ 2 task-count))})
 
-(defn backpressure [env period chunk]
+(defn backpressure
+  "Create a backpressure object (currently a map). `period` is the number of seconds pause in between
+  chunks of work. `chunk` is the number of items in a chunk of work before pause."
+  [env period chunk]
   (assoc env :period period :chunk chunk))
 
 (defn with-backpressure
@@ -62,6 +77,7 @@
                (log/info "awaiting chunking...")
                (deref chunking)
                (log/info "chunking done, notifying chan...")
+               (log/trace "(>!! chan :done)")
                (>!! queue :done)))
     finished))
 
@@ -74,6 +90,12 @@
     (swap! error-cnt dec)
     (throw (Exception. "blammo!"))))
 
+(defn log-id [writer id]
+  (binding [*out* writer]
+    ;; (.write writer id)
+    (println id)
+    id))
+
 (defn id-try-catch-logging [f success-writer retry-writer]
   (fn [id]
     (try
@@ -81,8 +103,7 @@
       (log-id success-writer id)
       (catch Exception e
         (log/warnf #_e "Caught exception, re-enqueuing %s" id)
-        (log-id retry-writer id)
-        ))))
+        (log-id retry-writer id)))))
 
 (defn print-id [id]
   (log/debugf "print id %s..." id)
@@ -93,12 +114,6 @@
   (log/debugf "Maybe print id %s..." id)
   (maybe-throw error-cnt)
   (print-id id))
-
-(defn log-id [writer id]
-  (binding [*out* writer]
-    ;; (.write writer id)
-    (println id)
-    id))
 
 (defn maybe-print-and-log-id [error-cnt writer id]
   (maybe-print-id error-cnt id)

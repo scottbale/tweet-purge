@@ -66,7 +66,7 @@ https://github.com/nrepl/nrepl and history https://nrepl.org/nrepl/about/history
 * not sure why it's being dowloaded as a dependency?
 
 cider-nrepl reminders
-* `M-x cider-repl-set-ns` or `C-c M-n`
+* `M-x cider-repl-set-ns` or `C-c M-n n`
 * `C-c C-k` read|eval current buffer `cider-load-buffer`
 * `C-x C-e` eval form at cursor
 * `M-.` jump to symbol at cursor
@@ -149,6 +149,21 @@ got periodic TimerTask thing working in `backpressure` namespace
 * Retry messed up, can't put id back in the `queue` because it's likely already at rate limit.
   Punting, just writing retry id's to separate log file. Simplifies some things.
 * moving filename strings to `scratch/env`
+
+## 11/10/20
+
+Ran a test of deleting about 375 tweets. First chunk of exactly 300 deleted and then as expected the
+process waited for the 15 minute backpressure window. But then when it resumed, it only deleted one
+more tweet and then stopped.
+
+## 11/12/20
+
+Found the bug: `backpressure/put-in` was doing its thing inside a `go` block, which means it was
+async and was racing with `do-per-chunk` promise deref and adding `:done` poison pill. Fixed it by
+removing the `go` block and using the synchronous `>!!`. `put-in` passed as `f` to `do-per-chunk` is
+intended to be synchronous; `do-per-chunk` queues up the first chunk synchronously and then
+schedules each subsequent chunk enqueuing on the executor. Added some docstrings as I have
+everything loaded back into my brain for the time being.
 
 ## Appendix
 
