@@ -165,6 +165,9 @@ intended to be synchronous; `do-per-chunk` queues up the first chunk synchronous
 schedules each subsequent chunk enqueuing on the executor. Added some docstrings as I have
 everything loaded back into my brain for the time being.
 
+https://github.com/clojure/tools.cli
+https://github.com/technomancy/leiningen/blob/master/doc/TUTORIAL.md#uberjar
+
 ## Appendix
 
 sample delete response

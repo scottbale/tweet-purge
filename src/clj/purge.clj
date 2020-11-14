@@ -103,24 +103,24 @@
         bp (bp/backpressure bp-env period chunk)]
     (do-for-all-tweets env bp delete!)))
 
+;; simple test ------------------------
+(defn echo [keys-and-tokens id]
+  (println ">>>>" id))
+
+(defn echo-tweet-ids [env]
+  (let [chunk 12
+        period (* 60 1)
+        bp-env (bp/backpressure-env 1)
+        bp (bp/backpressure bp-env period chunk)]
+    (do-for-all-tweets env bp echo)))
+;; end simple test ---------------------
+
 (comment
-
-  ;; simple test ------------------------
-  (defn echo [keys-and-tokens id]
-    (println ">>>>" id))
-
-  (defn echo-tweet-ids [env]
-    (let [chunk 12
-          period (* 60 1)
-          bp-env (bp/backpressure-env 1)
-          bp (bp/backpressure bp-env period chunk)]
-      (do-for-all-tweets env bp echo)))
 
   (echo-tweet-ids (assoc scratch/env
                          :tweets-file "testy.txt"
                          :success-file "echo.log"
                          :retry-file "echoretry.log"))
-  ;; end simple test ---------------------
 
   ;; zero
   (delete-all-tweets! scratch/env)
