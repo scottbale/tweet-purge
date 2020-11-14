@@ -1,9 +1,17 @@
 (ns purge
   (:require
    [backpressure :as bp]
+   [oauth]
    [clj-http.client :as client]
+   [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log]))
+
+(defn load-env
+  "Return env map loaded from env.edn file"
+  [env-edn]
+  (if (.exists (io/as-file env-edn))
+    (edn/read (java.io.PushbackReader. (io/reader env-edn)))))
 
 (defn handle-response [id response]
   (let [status (:status response)
@@ -77,63 +85,71 @@
 
 ;; main functions
 
-(defn do-for-all-tweets [{:keys [tweets-file success-file retry-file] :as env} backpressure f]
+(defn do-for-all-tweets
+  "Invoke a function `f` on each tweet id, using configured backpressure and logging. `f` is a
+  function of two args: `env` map and single String tweet id."
+  [{:keys [tweets-file success-file retry-file] :as env} f]
   (with-open [done-w (io/writer success-file)
               retry-w (io/writer retry-file)
               to-purge (io/reader tweets-file)]
     (let [tweets (line-seq to-purge)
-          pr (bp/with-backpressure backpressure
+          pr (bp/with-backpressure env
                (bp/id-try-catch-logging (partial f env) done-w retry-w)
                tweets)]
       (log/info ".....awaiting completion.....")
       (deref pr) ;; gotta block or else writer(s) get closed too soon
       (log/info "...done!"))))
 
-(defn get-all-tweets [env]
-  (let [chunk 900
+(defn get-all-tweets
+  "For each tweet id, with backpressure, invoke `get-tweet` function"
+  [env]
+  (let [chunk 900 ;; Twitter API documentation documents rate limit for retrieving tweets
         period (* 60 15) ;; 15 minutes rate limit
-        bp-env (bp/backpressure-env 1)
-        bp (bp/backpressure bp-env period chunk)]
-    (do-for-all-tweets env bp get-tweet)))
+        env (merge (bp/backpressure 1 period chunk) env)]
+    (do-for-all-tweets env get-tweet)))
 
-(defn delete-all-tweets! [env]
-  (let [chunk 300
+(defn delete-all-tweets!
+  "For each tweet id, with backpressure, invoke `delete!`. *This will delete tweets from twitter!*"
+  [env]
+  (let [chunk 300 ;; Twitter API documentation documents rate limit for deleting tweets
         period (* 60 15) ;; 15 minutes rate limit
-        bp-env (bp/backpressure-env 1)
-        bp (bp/backpressure bp-env period chunk)]
-    (do-for-all-tweets env bp delete!)))
+        env (merge (bp/backpressure 1 period chunk) env)]
+    (do-for-all-tweets env delete!)))
 
-;; simple test ------------------------
-(defn echo [keys-and-tokens id]
+(defn echo
+  "For test purposes only."
+  [keys-and-tokens id]
   (println ">>>>" id))
 
-(defn echo-tweet-ids [env]
+(defn echo-tweet-ids
+  "For test purposes only."
+  [env]
   (let [chunk 12
-        period (* 60 1)
-        bp-env (bp/backpressure-env 1)
-        bp (bp/backpressure bp-env period chunk)]
-    (do-for-all-tweets env bp echo)))
-;; end simple test ---------------------
+        period 60
+        env (merge (bp/backpressure 1 period chunk) env)]
+    (do-for-all-tweets env echo)))
 
 (comment
 
-  (echo-tweet-ids (assoc scratch/env
+  (merge (bp/backpressure 1 15 30) (load-env "env.edn"))
+
+  (echo-tweet-ids (assoc (load-env "env.edn")
                          :tweets-file "testy.txt"
                          :success-file "echo.log"
                          :retry-file "echoretry.log"))
 
   ;; zero
-  (delete-all-tweets! scratch/env)
+  (delete-all-tweets! (load-env "env.edn"))
 
   ;; two
   (let [id "1194396125861699590"
         ;;id "115814863581876225"
         ]
-    (delete! scratch/env id))
+    (delete! (load-env "env.edn") id))
 
   ;; four
   (let [id "115814863581876225"]
-    (get-tweet scratch/env id))
+    (get-tweet (load-env "env.edn") id))
 
 
   (defn tweet-ids-to-delete []

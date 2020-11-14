@@ -1,4 +1,11 @@
 (ns backpressure
+  "Twitter rate-limits some of its API endpoints, and the number of tweet ids as input may exceed the
+  rate limit.
+
+  Implements backpressure thusly: input tweet ids are chunked and asynchronously added as inputs to
+  core.async channel 'queue'. A ScheduledExecutorService is used to schedule the enqueuing of each
+  chunk, scheduled according to the backpressure chunk size and period of time. Meanwhile, the
+  'queue' is consumed in a go-loop which pulls each tweet id from it and invokes a function on it."
   (:require
    [clojure.core.async :refer [chan go go-loop >! >!! <!]]
    [clojure.java.io :as io]
@@ -51,18 +58,15 @@
         (f x)
         (recur (<! queue))))))
 
-(defn backpressure-env
-  "Create a backpressure 'environment' (currently containing a scheduled thread pool Executor which is
-  sized based on `task-count`, number of intended concurrent tasks, and which handles the scheduling
-  of future chunks after a pause)."
-  [task-count]
-  {:executor (Executors/newScheduledThreadPool (+ 2 task-count))})
-
 (defn backpressure
-  "Create a backpressure object (currently a map). `period` is the number of seconds pause in between
-  chunks of work. `chunk` is the number of items in a chunk of work before pause."
-  [env period chunk]
-  (assoc env :period period :chunk chunk))
+  "Creates a backpressure object to be used with `with-backpressure` function. `task-count` is the
+  expected number of concurrent tasks requiring backpressure. `period` is the number of seconds
+  pause in between chunks of work. `chunk` is the number of items in a chunk of work before pause.
+  Implementation notes: returned object is a map. A scheduled thread pool Executor is created, which
+  is used to schedule all future chunks after the first chunk. "
+  [task-count period chunk]
+  {:executor (Executors/newScheduledThreadPool (+ 2 task-count))
+   :period period :chunk chunk})
 
 (defn with-backpressure
   "Asynchronously execute f on successive chunks of collection coll, returning a Promise.
@@ -71,13 +75,18 @@
   (let [queue (chan chunk)
         finished (promise)
         chunking (do-per-chunk backpressure (partial put-in queue) coll)]
+    ;; `finished` promise is fulfilled at completion of go-loop within `looping-invoke`
     (looping-invoke queue f finished)
     (.submit executor
              (fn []
                (log/info "awaiting chunking...")
+               ;; `chunking` is fulfilled once last chunk is enqueued in chan...
                (deref chunking)
                (log/info "chunking done, notifying chan...")
                (log/trace "(>!! chan :done)")
+               ;; ...at which point this task enqueues a final poison pill which is
+               ;; consumed within `looping-invoke` go-loop, which is how it knows to
+               ;; terminate
                (>!! queue :done)))
     finished))
 
@@ -102,7 +111,7 @@
       (f id)
       (log-id success-writer id)
       (catch Exception e
-        (log/warnf #_e "Caught exception, re-enqueuing %s" id)
+        (log/warnf e "Caught %s, re-enqueuing %s: %s" (.getName (.getClass e)) id (.getMessage e))
         (log-id retry-writer id)))))
 
 (defn print-id [id]
@@ -122,15 +131,14 @@
 
 (comment
 
-  ;; zero
+  ;; simple test, some exceptions deliberately thrown
   (with-open [done-w (io/writer "tweets.log")
               retry-w (io/writer "retry.log")]
     (let [error-cnt (atom 3) ;; at most three errors
-          env (backpressure-env 1)
-          period (* 60 3) ;; 3 minutes
-          chunk 10
-          bp (backpressure env period chunk)
-          tweets (take 15 (map #(str "foo" %) (range)))
+          period 5
+          chunk 3
+          bp (backpressure 1 period chunk)
+          tweets (take 9 (map #(str "foo" %) (range)))
           pr (with-backpressure bp
                (id-try-catch-logging (partial maybe-print-id error-cnt) done-w retry-w)
                tweets)]
@@ -138,22 +146,6 @@
       (deref pr) ;; gotta block or else writer(s) get closed too soon
       (log/info "...done!")))
 
-  ;; one (outdated)
-  (with-open [w1 (io/writer "tweets.log" :append true)
-              w2 (io/writer "likes.log" :append true)]
-    (let [error-cnt (atom 3) ;; at most three errors
-          env (backpressure-env 2)
-          b1 (backpressure env 5 3)
-          b2 (backpressure env 3 5)
-          tweets (take 15 (map #(str "foo" %) (range)))
-          likes (take 22 (map #(str "bar" %) (range)))
-          p1 (with-backpressure b1 (comp (partial log-id w1) (partial maybe-print-id error-cnt))
-               tweets)
-          p2 (with-backpressure b2 (partial maybe-print-and-log-id error-cnt w2) likes)]
-      (log/info ".....awaiting completion.....")
-      (deref p1) ;; gotta block or else writer(s) get closed too soon
-      (deref p2)
-      (log/info "...done!")))
 
 
   ;; logging weirdness

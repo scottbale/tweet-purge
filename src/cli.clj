@@ -1,10 +1,9 @@
 (ns cli
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [clojure.string :as string]
-            [clojure.tools.logging :as log]
-            [clojure.tools.cli :refer [parse-opts]]
-            [purge :as p])
+  (:require
+   [clojure.string :as string]
+   [clojure.tools.logging :as log]
+   [clojure.tools.cli :refer [parse-opts]]
+   [purge :as p])
   (:gen-class))
 
 (def action-map {"delete!" p/delete-all-tweets!
@@ -39,12 +38,6 @@
 (defn env [{:keys [env]}]
   (or env "env.edn"))
 
-(defn load-env
-  "Return env map loaded from env.edn file"
-  [env-edn]
-  (if (.exists (io/as-file env-edn))
-    (edn/read (java.io.PushbackReader. (io/reader env-edn)))))
-
 (defn validate-args [args]
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
     (cond
@@ -58,8 +51,8 @@
       (let [action (first arguments)
             env-edn (env options)]
         (if-let [action-fn (action-map action)]
-          (if-let [env (load-env env-edn)]
-            {:action action-fn :env env}
+          (if-let [env (p/load-env env-edn)]
+            {:action action-fn :env env :action-name action}
             {:exit-message (error-msg ["Bad env.edn file" env-edn]) :ok? false})
           {:exit-message (error-msg ["Unknown action" action]) :ok? false}))
 
@@ -67,6 +60,7 @@
       {:exit-message (usage summary)})))
 
 (defn exit-msg [status message]
+  (println message)
   (log/log (if (zero? status) :info :error)
            message)
   status)
@@ -75,19 +69,22 @@
   "Performs an action. `action` is a function from the purge namespace (it is one of the values of
   `action-map` in this ns). It is a function of one parameter, which is the env map loaded from
   env.edn file."
-  [action env]
-  (action env))
+  [action action-name {:keys [tweets-file] :as env}]
+  (let [msg (format "Will perform action '%s' on tweets from file '%s'." action-name tweets-file)]
+    (println msg)
+    (log/info msg)
+    (action env)))
 
 (defn main [& args]
-  (let [{:keys [action env exit-message ok?] :as a} (validate-args args)]
+  (let [{:keys [action action-name env exit-message ok?] :as a} (validate-args args)]
     (if action
-      (engage action env))
-    (if exit-message
+      (do
+        (engage action action-name env)
+        0)
       (exit-msg (if ok? 0 1) exit-message))))
 
 (defn exit [status]
-  (when status
-    (System/exit status)))
+  (System/exit status))
 
 (defn -main [& args]
   (exit (apply main args)))

@@ -168,6 +168,38 @@ everything loaded back into my brain for the time being.
 https://github.com/clojure/tools.cli
 https://github.com/technomancy/leiningen/blob/master/doc/TUTORIAL.md#uberjar
 
+## 11/13/20
+
+Moved source files up under `src`, where Leiningen prefers them to be located by default. Now
+everything compiles for `uberjar` and I no longer have to compile each namespace manually in the
+repl.
+
+## 11/14/20
+
+Simplified `backpressure` API, collapsed two functions into one (did away with `backpressure-env`).
+Also, in `purge`, merge backpressure map into env map, allowing backpressure params to be overriden
+from env.edn file if so desired (helps me with tinkering when running app from cli).
+
+Improved logging of caught exceptions. Still unsure whether I should print stack trace each time.
+Yesterday's test demonstrated that exceptions tend to come in bulk, and that quickly generates a lot
+of logging.
+
+Commented out logging to console|stdout (`log4j2.properties`)
+
+Moved `load-env` function to `purge` ns so I could use it there when testing in repl, apart from
+`cli`.
+
+Added lots of docstrings.
+
+It occurs to me: could I do away with core.async in `backpressure` and just invoke function from
+within each task scheduled on scheduled Executor? Does using the channel buy me anything? Ease of
+testing?
+
+`purge` ns wasn't requiring `oauth` ns, which it needed to do even though I wasn't aliasing the ns.
+
+Tweaking of CLI, including getting `System/exit` working correctly; both printing and logging a
+start message in all cases; redirecting stderr to `/dev/null` because of noisy invalid cookie warnings.
+
 ## Appendix
 
 sample delete response
