@@ -200,6 +200,22 @@ testing?
 Tweaking of CLI, including getting `System/exit` working correctly; both printing and logging a
 start message in all cases; redirecting stderr to `/dev/null` because of noisy invalid cookie warnings.
 
+## 11/20/20
+
+TIL (was reminded) that metadata is put on a function _var_ . The `^` reader macro adds metadata to
+the function symbol `'foo` at read time, and the `defn` macro copies metadata to the function var
+`#'foo` at compile time. It's unclear whether the function itself can have metadata anymore.
+
+Annotated each individual tweet function with metadata describing its default backpressure, e.g.
+
+    (defn ^{:period (* 60 15) :chunk 300} delete! ...)
+
+Wrote a macro to make more concise main functions, e.g.
+
+    (def delete-all-tweets! (for-all-tweets delete!))
+
+Can now override `:period` and `:chunk` in environment
+
 ## Appendix
 
 sample delete response

@@ -25,7 +25,7 @@
       401 (Exception. (format "Unauthorized: %s" status-str))
       (Exception. (format "Unexpected response status: %s" status-str)))))
 
-(defn get-tweet
+(defn ^{:period (* 60 15) :chunk 900} get-tweet
   "Get a tweet from twitter"
   [{:keys [api-key access-token] :as keys-and-tokens} id]
   (log/debugf "requesting %s..." id)
@@ -55,7 +55,7 @@
         response (client/get url request)]
     (handle-response id response)))
 
-(defn delete!
+(defn ^{:period (* 60 15) :chunk 300} delete!
   "Delete a tweet from twitter"
   [{:keys [api-key access-token] :as keys-and-tokens} id]
   (log/debugf "deleting %s..." id)
@@ -83,51 +83,45 @@
         response (client/post url request)]
     (handle-response id response)))
 
-;; main functions
-
-(defn do-for-all-tweets
+(defn for-all-tweets*
   "Invoke a function `f` on each tweet id, using configured backpressure and logging. `f` is a
   function of two args: `env` map and single String tweet id."
-  [{:keys [tweets-file success-file retry-file] :as env} f]
-  (with-open [done-w (io/writer success-file)
-              retry-w (io/writer retry-file)
-              to-purge (io/reader tweets-file)]
-    (let [tweets (line-seq to-purge)
-          pr (bp/with-backpressure env
-               (bp/id-try-catch-logging (partial f env) done-w retry-w)
-               tweets)]
-      (log/info ".....awaiting completion.....")
-      (deref pr) ;; gotta block or else writer(s) get closed too soon
-      (log/info "...done!"))))
-
-(defn get-all-tweets
-  "For each tweet id, with backpressure, invoke `get-tweet` function"
-  [env]
-  (let [chunk 900 ;; Twitter API documentation documents rate limit for retrieving tweets
-        period (* 60 15) ;; 15 minutes rate limit
+  [f f-meta {:keys [tweets-file success-file retry-file] :as env}]
+  (let [keys [:period :chunk]
+        {:keys [chunk period]} (merge (select-keys f-meta keys) (select-keys env keys))
         env (merge (bp/backpressure 1 period chunk) env)]
-    (do-for-all-tweets env get-tweet)))
+    (with-open [done-w (io/writer success-file)
+                retry-w (io/writer retry-file)
+                to-purge (io/reader tweets-file)]
+      (let [tweets (line-seq to-purge)
+            pr (bp/with-backpressure env
+                 (bp/id-try-catch-logging (partial f env) done-w retry-w)
+                 tweets)]
+        (log/info ".....awaiting completion.....")
+        (deref pr) ;; gotta block or else writer(s) get closed too soon
+        (log/info "...done!")))))
 
-(defn delete-all-tweets!
-  "For each tweet id, with backpressure, invoke `delete!`. *This will delete tweets from twitter!*"
-  [env]
-  (let [chunk 300 ;; Twitter API documentation documents rate limit for deleting tweets
-        period (* 60 15) ;; 15 minutes rate limit
-        env (merge (bp/backpressure 1 period chunk) env)]
-    (do-for-all-tweets env delete!)))
+(defmacro for-all-tweets
+  "Returns a function of one arg, an environment map, which, when invoked, invokes function 'f' on
+  every tweet id specified by env, using configured backpressure and logging."
+  [f]
+  `(partial for-all-tweets* ~f (meta (var ~f))))
+
+;; main functions
+
+(def get-all-tweets (for-all-tweets get-tweet))
+
+(def delete-all-tweets! (for-all-tweets delete!))
 
 (defn echo
   "For test purposes only."
+  {:period 60 :chunk 12}
   [keys-and-tokens id]
   (println ">>>>" id))
 
-(defn echo-tweet-ids
-  "For test purposes only."
-  [env]
-  (let [chunk 12
-        period 60
-        env (merge (bp/backpressure 1 period chunk) env)]
-    (do-for-all-tweets env echo)))
+;; For test purposes only.
+(def echo-tweet-ids (for-all-tweets echo))
+
 
 (comment
 
