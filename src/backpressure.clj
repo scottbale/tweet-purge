@@ -12,7 +12,14 @@
   (:import
    [java.util.concurrent Executors TimeUnit ScheduledExecutorService]))
 
-(defn schedule [f scheduled-executor-service seconds]
+(defn submit
+  "Execute `f` asynchronously using the provided ExecutorService"
+  [f executor-service]
+  (.submit executor-service f))
+
+(defn schedule
+  "Schedule `f` for execution `seconds` later using the provided ScheduledExecutorService"
+  [f scheduled-executor-service seconds]
   (.schedule scheduled-executor-service f seconds TimeUnit/SECONDS))
 
 (defn with-backpressure
@@ -27,14 +34,13 @@
               (log/debugf "starting %d chunk" chunk-nm)
               (let [some-xs (take chunk xs)
                     rest-xs (drop chunk xs)]
-                (doseq [x some-xs]
-                  (f x))
+                (dorun (map f some-xs))
                 (if (seq rest-xs)
                   (do
                     (log/tracef "next chunk %d: scheduling" chunk-nm)
                     (schedule #(do-next-chunk rest-xs (inc chunk-nm)) executor period))
                   (deliver completion true))))]
-      (do-next-chunk coll 0)
+      (submit #(do-next-chunk coll 0) executor)
       completion)))
 
 (defn backpressure
@@ -47,6 +53,12 @@
   {:executor (Executors/newScheduledThreadPool (+ 2 task-count))
    :period period :chunk chunk})
 
+(defn close
+  "Close any resources of the `backpressure` obj. (Too bad `with-open` macro is limited to `.close`
+  methods of pojos)."
+  [{:keys [executor] :as bp}]
+  (when executor
+    (.shutdown executor)))
 
 ;; sample function(s)
 
@@ -69,7 +81,7 @@
       (f id)
       (log-id success-writer id)
       (catch Exception e
-        (log/warnf e "Caught %s, re-enqueuing %s: %s" (.getName (.getClass e)) id (.getMessage e))
+        (log/warnf e "Caught %s, noting %s for later retry: %s" (.getName (.getClass e)) id (.getMessage e))
         (log-id retry-writer id)))))
 
 (defn print-id [id]

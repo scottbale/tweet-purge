@@ -221,6 +221,21 @@ Can now override `:period` and `:chunk` in environment
 TIL in emacs, open a log file in a buffer then `M-x auto-revert-mode` set to true, to effectively
 tail the log. https://stackoverflow.com/a/19589885/2495576
 
+## 11/23/20
+
+Tweaked `with-backpressure` to `submit` initial chunk using Executor rather than executing it
+synchronously. Now every chunk takes place in an executor thread, and the Promise is returned
+immediately - `with-backpressure` is truly completely async now. Also switched to `dorun` rather
+than `doseq`.
+
+Added a `close` function to `backpressure` ns so that ScheduledExecutor can be shut down. Too bad
+`with-open` macro only works on `.close` method of pojos. I did some googling about `with-open` on a
+protocol with a `close` function, came across this old ticket
+https://clojure.atlassian.net/browse/CLJ-2
+
+Next: Revisit `id-try-catch-logging` and see if, by rearranging arg order, it can be invoked using
+`partial` rather than having the function itself return another function.
+
 ## Appendix
 
 sample delete response
