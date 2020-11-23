@@ -216,6 +216,11 @@ Wrote a macro to make more concise main functions, e.g.
 
 Can now override `:period` and `:chunk` in environment
 
+## 11/22/20
+
+TIL in emacs, open a log file in a buffer then `M-x auto-revert-mode` set to true, to effectively
+tail the log. https://stackoverflow.com/a/19589885/2495576
+
 ## Appendix
 
 sample delete response

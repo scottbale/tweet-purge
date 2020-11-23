@@ -7,7 +7,6 @@
   chunk, scheduled according to the backpressure chunk size and period of time. Meanwhile, the
   'queue' is consumed in a go-loop which pulls each tweet id from it and invokes a function on it."
   (:require
-   [clojure.core.async :refer [chan go go-loop >! >!! <!]]
    [clojure.java.io :as io]
    [clojure.tools.logging :as log])
   (:import
@@ -16,19 +15,20 @@
 (defn schedule [f scheduled-executor-service seconds]
   (.schedule scheduled-executor-service f seconds TimeUnit/SECONDS))
 
-(defn do-per-chunk
-  "Execute function f for each chunk of collection `coll`. First chunk is executed immediately, each
-  subsequent one after `period` seconds. Return a Promise which will be completed when all chunks
-  are completed. Uses provided ScheduledExecutorService. f should be a function of a single arg,
-  which is a collection of at most length equal to chunk. The time is measured from the end of the
-  function invocation."
+(defn with-backpressure
+  "aka 'Do per chunk': Asynchronously execute function `f` for each chunk of collection `coll`. First
+  chunk is executed immediately, each subsequent one after `period` seconds. Return a Promise which
+  will be completed when all chunks are completed. Uses provided ScheduledExecutorService. f should
+  be a function of a single arg, which is a single item from `coll`. The time is measured from the
+  end of the function invocation."
   [{:keys [executor period chunk]} f coll]
   (let [completion (promise)]
     (letfn [(do-next-chunk [xs chunk-nm]
               (log/debugf "starting %d chunk" chunk-nm)
               (let [some-xs (take chunk xs)
                     rest-xs (drop chunk xs)]
-                (f some-xs)
+                (doseq [x some-xs]
+                  (f x))
                 (if (seq rest-xs)
                   (do
                     (log/tracef "next chunk %d: scheduling" chunk-nm)
@@ -36,27 +36,6 @@
                   (deliver completion true))))]
       (do-next-chunk coll 0)
       completion)))
-
-(defn put-in
-  "Synchronously add each of `coll` items to channel"
-  [chan coll]
-  (log/debugf "about to add %d items to chan" (count coll))
-  (doseq [x coll]
-    (log/tracef "(>!! chan %s)" x)
-    (>!! chan x)))
-
-(defn looping-invoke
-  "In a go loop, repeatedly invoke function `f`, passing as a single arg each item retrieved from the
-  channel `queue`. `finished` is a Promise: when `:done` poison pill is retrieved from the chan,
-  deliver `true` to the Promise."
-  [queue f finished]
-  (go-loop [x (<! queue)]
-    (log/tracef "(<! chan: %s)" x)
-    (if (= x :done)
-      (deliver finished true)
-      (do
-        (f x)
-        (recur (<! queue))))))
 
 (defn backpressure
   "Creates a backpressure object to be used with `with-backpressure` function. `task-count` is the
@@ -68,27 +47,6 @@
   {:executor (Executors/newScheduledThreadPool (+ 2 task-count))
    :period period :chunk chunk})
 
-(defn with-backpressure
-  "Asynchronously execute f on successive chunks of collection coll, returning a Promise.
-  Backpressure map will indicate chunk size and period, in seconds, in between each chunk."
-  [{:keys [executor chunk] :as backpressure} f coll]
-  (let [queue (chan chunk)
-        finished (promise)
-        chunking (do-per-chunk backpressure (partial put-in queue) coll)]
-    ;; `finished` promise is fulfilled at completion of go-loop within `looping-invoke`
-    (looping-invoke queue f finished)
-    (.submit executor
-             (fn []
-               (log/info "awaiting chunking...")
-               ;; `chunking` is fulfilled once last chunk is enqueued in chan...
-               (deref chunking)
-               (log/info "chunking done, notifying chan...")
-               (log/trace "(>!! chan :done)")
-               ;; ...at which point this task enqueues a final poison pill which is
-               ;; consumed within `looping-invoke` go-loop, which is how it knows to
-               ;; terminate
-               (>!! queue :done)))
-    finished))
 
 ;; sample function(s)
 
