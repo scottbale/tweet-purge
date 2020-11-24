@@ -83,6 +83,33 @@
         response (client/post url request)]
     (handle-response id response)))
 
+(defn ^{:period (* 60 15) :chunk 300} unfavorite!
+  "Unfavorite (unlike) a favorited|liked tweet from twitter"
+  [{:keys [api-key access-token] :as keys-and-tokens} id]
+  (log/debugf "unfavoriting %s..." id)
+  (let [verb "POST"
+        url "https://api.twitter.com/1.1/favorites/destroy.json"
+        nonce (oauth/nonce)
+        ts (oauth/timestamp)
+        params ["id" id
+                "oauth_consumer_key" api-key
+                "oauth_nonce" nonce
+                "oauth_signature_method" "HMAC-SHA1"
+                "oauth_timestamp" ts
+                "oauth_token" access-token
+                "oauth_version" "1.0"]
+        request {:accept :json
+                 :content-type :json
+                 :query-params {"id" id}
+                 :headers
+                 {
+                  :Authorization (oauth/header keys-and-tokens nonce ts
+                                               (oauth/signature keys-and-tokens verb url params))
+                  }
+                 :throw-exceptions false}
+        response (client/post url request)]
+    (handle-response id response)))
+
 (defn for-all-tweets*
   "Invoke a function `f` on each tweet id, using configured backpressure and logging. `f` is a
   function of two args: `env` map and single String tweet id."
@@ -93,13 +120,16 @@
     (with-open [done-w (io/writer success-file)
                 retry-w (io/writer retry-file)
                 to-purge (io/reader tweets-file)]
-      (let [tweets (line-seq to-purge)
-            pr (bp/with-backpressure env
-                 (bp/id-try-catch-logging (partial f env) done-w retry-w)
-                 tweets)]
-        (log/info ".....awaiting completion.....")
-        (deref pr) ;; gotta block or else writer(s) get closed too soon
-        (log/info "...done!")))))
+      (try
+        (let [tweets (line-seq to-purge)
+              pr (bp/with-backpressure env
+                   (bp/id-try-catch-logging (partial f env) done-w retry-w)
+                   tweets)]
+          (log/info "...awaiting completion...")
+          (deref pr) ;; gotta block or else writer(s) get closed too soon
+          (log/info "...done!"))
+        (finally
+          (bp/close env))))))
 
 (defmacro for-all-tweets
   "Returns a function of one arg, an environment map, which, when invoked, invokes function 'f' on
@@ -112,6 +142,8 @@
 (def get-all-tweets (for-all-tweets get-tweet))
 
 (def delete-all-tweets! (for-all-tweets delete!))
+
+(def unfavorite-all-tweets! (for-all-tweets unfavorite!))
 
 (defn echo
   "For test purposes only."
@@ -130,7 +162,9 @@
   (echo-tweet-ids (assoc (load-env "env.edn")
                          :tweets-file "testy.txt"
                          :success-file "echo.log"
-                         :retry-file "echoretry.log"))
+                         :retry-file "echoretry.log"
+                         :period 8
+                         :chunk 4))
 
   ;; zero
   (delete-all-tweets! (load-env "env.edn"))

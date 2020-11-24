@@ -7,6 +7,7 @@
   (:gen-class))
 
 (def action-map {"delete!" p/delete-all-tweets!
+                 "unfavorite!" p/unfavorite-all-tweets!
                  "get" p/get-all-tweets
                  "echo" p/echo-tweet-ids})
 
@@ -19,8 +20,9 @@
   (->> ["Delete tweets"
         ""
         "Usage: tweet-purge [options] action"
-        "where action is one of [delete!|get|echo]"
+        "where action is one of [delete!|unfavorite!|get|echo]"
         "\tdelete! - delete each tweet"
+        "\tunfavorite! - unfavorite (unlike) each tweet"
         "\tget - retrieve each tweet"
         "\techo - just print the tweet id, do not contact twitter"
         ""

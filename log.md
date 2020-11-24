@@ -236,6 +236,31 @@ https://clojure.atlassian.net/browse/CLJ-2
 Next: Revisit `id-try-catch-logging` and see if, by rearranging arg order, it can be invoked using
 `partial` rather than having the function itself return another function.
 
+Implemented `unfavorite!`
+
+## 11/24/20
+
+Ran `unfavorite` on my entire file of 7428 liked tweets. Glad for my log file: I can see I had 2706
+http 200s and 5281 http 404s. My twitter profile still shows about 5.7k likes, down from over 8k.
+Puzzling. I don't think I've liked that many tweets since I downloaded my data. Could many of these
+404s be retried? If so, Would be nice to have logged them to a separate file (like I do the retry
+file, which is empty).
+
+Put `try-catch` around main method, and log any caught Throwable (because at the moment the bash
+start script is redireting stderr to `/dev/null`). And/or maybe redirect stderr to some file. Or
+just solve the mystery of these invalid cookie header warnings. Sample:
+
+    Nov 23, 2020 9:24:05 PM org.apache.http.client.protocol.ResponseProcessCookies processCookies
+    WARNING: Invalid cookie header: "set-cookie: personalization_id="v1_REDACTED=="; Max-Age=63072000; Expires=Thu, 24 Nov 2022 03:24:05 GMT; Path=/; Domain=.twitter.com; Secure; SameSite=None". Invalid 'expires' attribute: Thu, 24 Nov 2022 03:24:05 GMT
+    Nov 23, 2020 9:24:05 PM org.apache.http.client.protocol.ResponseProcessCookies processCookies
+    WARNING: Invalid cookie header: "set-cookie: guest_id=v1%REDACTED; Max-Age=63072000; Expires=Thu, 24 Nov 2022 03:24:05 GMT; Path=/; Domain=.twitter.com; Secure; SameSite=None". Invalid 'expires' attribute: Thu, 24 Nov 2022 03:24:05 GMT
+
+Pairs of warnings like these two repeatedly logged. Each time, looks like different values for
+`personalization_id` and `guest_id`. `personalization_id` looks like maybe base 64 encoding.
+
+I just noticed I'm inconsistent on where I place the map of metadata on `defn`s in the `purge`
+namespace.
+
 ## Appendix
 
 sample delete response
