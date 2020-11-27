@@ -75,14 +75,17 @@
     (println id)
     id))
 
-(defn id-try-catch-logging [f success-writer retry-writer]
-  (fn [id]
-    (try
-      (f id)
-      (log-id success-writer id)
-      (catch Exception e
-        (log/warnf e "Caught %s, noting %s for later retry: %s" (.getName (.getClass e)) id (.getMessage e))
-        (log-id retry-writer id)))))
+(defn id-try-catch-logging
+  "Given the function `f` of one arg (a tweet id), invoke it within try-catch. On success, write the
+  id to the `success-writer` Writer. If an exception is caught, log a warning and write the tweet id
+  to the supplied `retry-writer` for later retrying."
+  [success-writer retry-writer f id]
+  (try
+    (f id)
+    (log-id success-writer id)
+    (catch Exception e
+      (log/warnf e "Caught %s, noting %s for later retry: %s" (.. e getClass getSimpleName) id (.getMessage e))
+      (log-id retry-writer id))))
 
 (defn print-id [id]
   (log/debugf "print id %s..." id)
@@ -110,7 +113,7 @@
           bp (backpressure 1 period chunk)
           tweets (take 9 (map #(str "foo" %) (range)))
           pr (with-backpressure bp
-               (id-try-catch-logging (partial maybe-print-id error-cnt) done-w retry-w)
+               (partial id-try-catch-logging done-w retry-w (partial maybe-print-id error-cnt))
                tweets)]
       (log/info ".....awaiting completion.....")
       (deref pr) ;; gotta block or else writer(s) get closed too soon

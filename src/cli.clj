@@ -68,10 +68,10 @@
   status)
 
 (defn exit-err [e]
-  (let [message (format "Caught %s: %s" (.getSimpleName (.getClass e)) (.getMessage e))
+  (let [message (format "Caught %s: %s" (.. e getClass getSimpleName) (.getMessage e))
         status 1]
     (println message)
-    (log/error message e)
+    (log/error e message)
     status))
 
 (defn engage

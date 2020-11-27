@@ -126,7 +126,7 @@
       (try
         (let [tweets (line-seq to-purge)
               pr (bp/with-backpressure env
-                   (bp/id-try-catch-logging (partial f env) done-w retry-w)
+                   (partial bp/id-try-catch-logging done-w retry-w (partial f env))
                    tweets)]
           (log/info "...awaiting completion...")
           (deref pr) ;; gotta block or else writer(s) get closed too soon

@@ -268,7 +268,7 @@ checklist to make repo public:
 * tar up jar and script, upload to GH as a release?
 * **done** `try-catch` main method
 * **done** consistent metadata
-* `id-try-catch-logging` todo
+* **done** `id-try-catch-logging` todo
 * remove most commented code snippets, possibly convert to unit tests
 
 re-arranged subdirectories of files; bash scripts WIP
