@@ -273,6 +273,11 @@ checklist to make repo public:
 
 re-arranged subdirectories of files; bash scripts WIP
 
+## 11/27/20
+
+Upgraded `clj-http` lib; set `:cookie-policy :none` on all requests to completely ignore cookies, no
+longer seeing the "invalid cookie header" warnings.
+
 ## Appendix
 
 sample delete response

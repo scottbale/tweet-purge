@@ -52,7 +52,8 @@
                   :Authorization (oauth/header keys-and-tokens nonce ts 
                                                (oauth/signature keys-and-tokens verb url params))
                   }
-                 :throw-exceptions false}
+                 :throw-exceptions false
+                 :cookie-policy :none}
         response (client/get url request)]
     (handle-response id response)))
 
@@ -81,7 +82,8 @@
                   :Authorization (oauth/header keys-and-tokens nonce ts
                                                (oauth/signature keys-and-tokens verb url params))
                   }
-                 :throw-exceptions false}
+                 :throw-exceptions false
+                 :cookie-policy :none}
         response (client/post url request)]
     (handle-response id response)))
 
@@ -109,7 +111,8 @@
                   :Authorization (oauth/header keys-and-tokens nonce ts
                                                (oauth/signature keys-and-tokens verb url params))
                   }
-                 :throw-exceptions false}
+                 :throw-exceptions false
+                 :cookie-policy :none}
         response (client/post url request)]
     (handle-response id response)))
 
