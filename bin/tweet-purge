@@ -1,0 +1,7 @@
+#!/bin/sh
+
+TLD=$(dirname $0)/..
+LIBDIR=$TLD/lib
+LOGDIR=$TLD/log
+
+java -Xmx1024m -Xms1024m -jar $LIBDIR/twitter-purge.jar $@ 2> $LOGDIR/startup.log

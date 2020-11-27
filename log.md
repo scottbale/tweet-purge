@@ -261,6 +261,18 @@ Pairs of warnings like these two repeatedly logged. Each time, looks like differ
 I just noticed I'm inconsistent on where I place the map of metadata on `defn`s in the `purge`
 namespace.
 
+## 11/26/20
+
+checklist to make repo public:
+* clean up `README.md`, document steps for someone else to use this
+* tar up jar and script, upload to GH as a release?
+* `try-catch` main method
+* consistent metadata
+* `id-try-catch-logging` todo
+* remove most commented code snippets, possibly convert to unit tests
+
+re-arranged subdirectories of files; bash scripts WIP
+
 ## Appendix
 
 sample delete response
