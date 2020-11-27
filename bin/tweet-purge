@@ -1,7 +1,11 @@
 #!/bin/sh
 
 TLD=$(dirname $0)/..
-LIBDIR=$TLD/lib
-LOGDIR=$TLD/log
+pushd $TLD > /dev/null
+LIBDIR=lib
+LOGDIR=log
 
 java -Xmx1024m -Xms1024m -jar $LIBDIR/twitter-purge.jar $@ 2> $LOGDIR/startup.log
+EXIT_CODE=$?
+popd > /dev/null
+exit $EXIT_CODE
