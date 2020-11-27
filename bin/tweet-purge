@@ -2,10 +2,5 @@
 
 TLD=$(dirname $0)/..
 LIBDIR=$TLD/lib
-LOGDIR=log
 
-if [ ! -d $LOGDIR ]; then
-    mkdir $LOGDIR
-fi
-
-java -Xmx1024m -Xms1024m -jar $LIBDIR/twitter-purge.jar $@ 2> $LOGDIR/startup.log
+java -Xmx1024m -Xms1024m -jar $LIBDIR/twitter-purge.jar $@

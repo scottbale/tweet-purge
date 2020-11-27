@@ -278,6 +278,11 @@ re-arranged subdirectories of files; bash scripts WIP
 Upgraded `clj-http` lib; set `:cookie-policy :none` on all requests to completely ignore cookies, no
 longer seeing the "invalid cookie header" warnings.
 
+Now that those warnings are gone, it simplifies the startup script and logging: I tore out the
+redirect of stderr to a startup log file.
+
+Created sample env.edn file. Tweaked dist script.
+
 ## Appendix
 
 sample delete response
