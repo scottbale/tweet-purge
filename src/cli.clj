@@ -67,6 +67,13 @@
            message)
   status)
 
+(defn exit-err [e]
+  (let [message (format "Caught %s: %s" (.getSimpleName (.getClass e)) (.getMessage e))
+        status 1]
+    (println message)
+    (log/error message e)
+    status))
+
 (defn engage
   "Performs an action. `action` is a function from the purge namespace (it is one of the values of
   `action-map` in this ns). It is a function of one parameter, which is the env map loaded from
@@ -78,12 +85,15 @@
     (action env)))
 
 (defn main [& args]
-  (let [{:keys [action action-name env exit-message ok?] :as a} (validate-args args)]
-    (if action
-      (do
-        (engage action action-name env)
-        0)
-      (exit-msg (if ok? 0 1) exit-message))))
+  (try
+    (let [{:keys [action action-name env exit-message ok?] :as a} (validate-args args)]
+      (if action
+        (do
+          (engage action action-name env)
+          0)
+        (exit-msg (if ok? 0 1) exit-message)))
+    (catch Exception e
+      (exit-err e))))
 
 (defn exit [status]
   (System/exit status))
