@@ -25,8 +25,9 @@
       401 (Exception. (format "Unauthorized: %s" status-str))
       (Exception. (format "Unexpected response status: %s" status-str)))))
 
-(defn ^{:period (* 60 15) :chunk 900} get-tweet
+(defn get-tweet
   "Get a tweet from twitter"
+  {:period (* 60 15) :chunk 900}
   [{:keys [api-key access-token] :as keys-and-tokens} id]
   (log/debugf "requesting %s..." id)
   (let [verb "GET"
@@ -55,8 +56,9 @@
         response (client/get url request)]
     (handle-response id response)))
 
-(defn ^{:period (* 60 15) :chunk 300} delete!
+(defn delete!
   "Delete a tweet from twitter"
+  {:period (* 60 15) :chunk 300}
   [{:keys [api-key access-token] :as keys-and-tokens} id]
   (log/debugf "deleting %s..." id)
   (let [verb "POST"
@@ -83,8 +85,9 @@
         response (client/post url request)]
     (handle-response id response)))
 
-(defn ^{:period (* 60 15) :chunk 300} unfavorite!
+(defn unfavorite!
   "Unfavorite (unlike) a favorited|liked tweet from twitter"
+  {:period (* 60 15) :chunk 300}
   [{:keys [api-key access-token] :as keys-and-tokens} id]
   (log/debugf "unfavoriting %s..." id)
   (let [verb "POST"
@@ -160,11 +163,11 @@
   (merge (bp/backpressure 1 15 30) (load-env "env.edn"))
 
   (echo-tweet-ids (assoc (load-env "env.edn")
-                         :tweets-file "testy.txt"
-                         :success-file "echo.log"
-                         :retry-file "echoretry.log"
-                         :period 8
-                         :chunk 4))
+                         :tweets-file "likez.txt"
+                         :success-file "likez.log"
+                         :retry-file "likezretry.log"
+                         :chunk 4
+                         :period 8))
 
   ;; zero
   (delete-all-tweets! (load-env "env.edn"))

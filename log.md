@@ -267,7 +267,7 @@ checklist to make repo public:
 * clean up `README.md`, document steps for someone else to use this
 * tar up jar and script, upload to GH as a release?
 * **done** `try-catch` main method
-* consistent metadata
+* **done** consistent metadata
 * `id-try-catch-logging` todo
 * remove most commented code snippets, possibly convert to unit tests
 
