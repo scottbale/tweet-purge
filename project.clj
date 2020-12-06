@@ -1,7 +1,6 @@
 (defproject twitter-purge "0.0.1"
   :description "Delete most of my tweets"
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [org.clojure/core.async "1.2.603" :exclusions [org.clojure/clojure]]
                  [org.clojure/tools.cli "1.0.194"]
                  [org.clojure/tools.nrepl "0.2.13"]
                  [org.clojure/tools.logging "1.1.0"]
