@@ -1,15 +1,28 @@
-## twitter purge
+tweet purge
+===========
 
-Delete most of my old tweets
+I wrote a program to delete most of my old tweets and likes from my [Twitter account](https://twitter.com/scottbale).
 
-links
-* https://clojuredocs.org/clojure.core/load-file
-* https://github.com/dakrone/clj-http
-* https://developer.twitter.com/en/docs/basics/authentication/oauth-1-0a/creating-a-signature
-* https://developer.twitter.com/en/docs/basics/rate-limiting#:~:text=Rate%20limiting%20of%20the%20standard,per%20window%20per%20access%20token.
-* https://developer.twitter.com/en/apps/18264608
-* https://developer.twitter.com/en/docs/api-reference-index
-* https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/get-statuses-show-id
-* https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/post-statuses-destroy-id
-* https://commons.apache.org/proper/commons-codec/apidocs/index.html?org/apache/commons/codec/digest/HmacUtils.html
-* http://commons.apache.org/proper/commons-codec/
+Usage
+-----
+
+If you want to use this program yourself, you'll have to use your own Twitter credentials. (I have not set this app up to authenticate on someone else's behalf using my app credentials.) This means, if you haven't already, you'll have to apply for and create a [twitter developer account](https://developer.twitter.com/en/apply-for-access) and generate your own API key and secret pair and your own app access token and secret pair. These four values then need to be placed in the [env.edn](env.edn.sample) file.
+
+You'll also have to create a newline-separated text file of tweet ids to be deleted or unfavorited. I did this by [downloading my twitter archive](https://help.twitter.com/en/managing-your-account/how-to-download-your-twitter-archive).
+
+### Quick start
+
+Extract release tarball.
+
+``` shell
+$ ./bin/tweet-purge --help
+```
+
+### Build from source
+
+``` shell
+$ lein uberjar
+$ tools/dist.sh
+```
+
+Tarball will be in `build/tweet-purge.tar`.

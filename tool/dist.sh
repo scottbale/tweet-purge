@@ -18,6 +18,6 @@ cp bin/tweet-purge build/tweet-purge/bin/
 cp target/twitter-purge-*-standalone.jar build/tweet-purge/lib/twitter-purge.jar
 cp util/* build/tweet-purge/util/
 cp env.edn.sample build/tweet-purge/
-pushd build
+cd build
 tar -cf tweet-purge.tar tweet-purge
-popd
+cd ..

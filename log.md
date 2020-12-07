@@ -15,6 +15,19 @@ https://developer.twitter.com/
         id = 
         trim_user = true
 
+links
+* https://clojuredocs.org/clojure.core/load-file
+* https://github.com/dakrone/clj-http
+* https://developer.twitter.com/en/docs/basics/authentication/oauth-1-0a/creating-a-signature
+* https://developer.twitter.com/en/docs/basics/rate-limiting#:~:text=Rate%20limiting%20of%20the%20standard,per%20window%20per%20access%20token.
+* https://developer.twitter.com/en/apps/18264608
+* https://developer.twitter.com/en/docs/api-reference-index
+* https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/get-statuses-show-id
+* https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/post-statuses-destroy-id
+* https://commons.apache.org/proper/commons-codec/apidocs/index.html?org/apache/commons/codec/digest/HmacUtils.html
+* http://commons.apache.org/proper/commons-codec/
+
+
 ## 7/3/20
 
 * Created `project.clj`, adopted standard project layout
@@ -264,7 +277,7 @@ namespace.
 ## 11/26/20
 
 checklist to make repo public:
-* clean up `README.md`, document steps for someone else to use this
+* **done** clean up `README.md`, document steps for someone else to use this
 * tar up jar and script, upload to GH as a release?
 * **done** `try-catch` main method
 * **done** consistent metadata
@@ -282,6 +295,11 @@ Now that those warnings are gone, it simplifies the startup script and logging: 
 redirect of stderr to a startup log file.
 
 Created sample env.edn file. Tweaked dist script.
+
+## 12/7/20
+
+Better README
+
 
 ## Appendix
 
