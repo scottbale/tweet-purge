@@ -298,7 +298,12 @@ Created sample env.edn file. Tweaked dist script.
 
 ## 12/7/20
 
-Better README
+Better README, tagged v. 0.0.1, made repo public
+
+## 12/8/20
+
+corrected backpressure docstring; inverted order of `try-finally` and `with-open`; removed unused
+dep; removed some commented code
 
 
 ## Appendix

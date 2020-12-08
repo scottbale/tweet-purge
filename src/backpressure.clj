@@ -1,11 +1,12 @@
 (ns backpressure
-  "Twitter rate-limits some of its API endpoints, and the number of tweet ids as input may exceed the
+  "Twitter rate-limits some of its API endpoints and the number of tweet ids as input may exceed the
   rate limit.
 
-  Implements backpressure thusly: input tweet ids are chunked and asynchronously added as inputs to
-  core.async channel 'queue'. A ScheduledExecutorService is used to schedule the enqueuing of each
-  chunk, scheduled according to the backpressure chunk size and period of time. Meanwhile, the
-  'queue' is consumed in a go-loop which pulls each tweet id from it and invokes a function on it."
+  Implements backpressure thusly: input tweet ids are chunked into whatever chunk size the Twitter
+  API rate limit requires. Each chunk is executed asynchronously using a ScheduledExecutorService.
+  The first chunk is submitted right away, each subsequent chunk is scheduled to begin after the
+  previous chunk ends and following a delay (period) required by the rate limit. A Promise is
+  returned to the caller which is completed once all chunks complete."
   (:require
    [clojure.java.io :as io]
    [clojure.tools.logging :as log])
@@ -124,7 +125,7 @@
   ;; logging weirdness
   (log/info "log something standard")
   (future (log/info "log something async"))
-  (go (log/info "log something go block"))
+  ;; (go (log/info "log something go block"))
   ;; only this last one prints to the repl (all four print to cider buffer)
   (let [ses (Executors/newScheduledThreadPool 1)]
     (.submit ses ^Runnable (fn [] (log/info "log something using Executor"))))

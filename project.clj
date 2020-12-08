@@ -7,11 +7,7 @@
                  [clj-http "3.10.3" :exclusions [commons-codec]]
                  [commons-codec "1.14"]
                  [org.apache.logging.log4j/log4j-api "2.13.3"]
-                 [org.apache.logging.log4j/log4j-core "2.13.3"]
-                 [org.apache.logging.log4j/log4j-slf4j-impl "2.13.3"]
-                 ;; [org.slf4j/slf4j-api "1.7.5"]
-                 ;; [org.slf4j/slf4j-log4j12 "1.7.5"]
-                 ]
+                 [org.apache.logging.log4j/log4j-core "2.13.3"]]
   :jvm-opts ["-Dclojure.tools.logging.factory=clojure.tools.logging.impl/log4j2-factory"]
   :main cli
   :aot [backpressure oauth purge cli]
