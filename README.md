@@ -1,7 +1,7 @@
 tweet purge
 ===========
 
-I wrote a program to delete most of my old tweets and likes from my [Twitter account](https://twitter.com/scottbale).
+I wrote a program to delete most of my old tweets and likes from my twitter account.
 
 Usage
 -----
