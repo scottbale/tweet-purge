@@ -5,6 +5,7 @@
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.clojure/tools.cli "1.0.194"]
                  [org.clojure/tools.logging "1.1.0"]
+                 [cheshire "5.10.0"]
                  [clj-http "3.10.3" :exclusions [commons-codec]]
                  [commons-codec "1.14"]
                  [org.apache.logging.log4j/log4j-api "2.13.3"]

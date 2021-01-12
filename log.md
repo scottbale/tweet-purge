@@ -305,6 +305,10 @@ Better README, tagged v. 0.0.1, made repo public
 corrected backpressure docstring; inverted order of `try-finally` and `with-open`; removed unused
 dep; removed some commented code
 
+## 1/11/21
+
+twitter list get members
+https://developer.twitter.com/en/docs/twitter-api/v1/accounts-and-users/create-manage-lists/api-reference/get-lists-members
 
 ## Appendix
 

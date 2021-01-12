@@ -2,6 +2,7 @@
   (:require
    [backpressure :as bp]
    [oauth]
+   [cheshire.core :as json]
    [clj-http.client :as client]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
@@ -24,6 +25,46 @@
       429 (Exception. "Exceeded rate.")
       401 (Exception. (format "Unauthorized: %s" status-str))
       (Exception. (format "Unexpected response status: %s" status-str)))))
+
+(defn get-list-members
+  "Get lists membership from twitter"
+  [{:keys [api-key access-token] :as keys-and-tokens} list-id list-slug]
+  (log/debugf "requesting membership of list %s..." list-slug)
+  (let [verb "GET"
+        url "https://api.twitter.com/1.1/lists/members.json"
+        nonce (oauth/nonce)
+        ts (oauth/timestamp)
+        ;; params need to be in alphabetical order
+        params ["count" "1000"
+                "include_entities" "false"
+                "list_id" list-id
+                "oauth_consumer_key" api-key
+                "oauth_nonce" nonce
+                "oauth_signature_method" "HMAC-SHA1"
+                "oauth_timestamp" ts
+                "oauth_token" access-token
+                "oauth_version" "1.0"
+                "skip_status" "true"]
+        request {:accept :json
+                 :query-params (select-keys
+                                (apply assoc {} params)
+                                ["list_id" "count" "include_entities" "skip_status"])
+                 :headers
+                 {
+                  :Authorization (oauth/header keys-and-tokens nonce ts
+                                               (oauth/signature keys-and-tokens verb url params))
+                  }
+                 :throw-exceptions false
+                 :cookie-policy :none}
+        response (client/get url request)
+        status (:status response)]
+    (if (= 200 status)
+      (with-open [list-w (io/writer (str list-slug ".txt"))]
+        (binding [*out* list-w]
+          (let [body (json/parse-string (:body response))]
+            (doseq [u (map #(%1 "screen_name") (body "users"))]
+              (println u)))))
+      (str "dang!" status))))
 
 (defn get-tweet
   "Get a tweet from twitter"
@@ -162,6 +203,9 @@
 
 
 (comment
+
+  (get-list-members (load-env "env.edn") "1234567890123456789" "blahblah")
+  (get-tweet (load-env "env.edn") "115814863581876225")
 
   (merge (bp/backpressure 1 15 30) (load-env "env.edn"))
 
